@@ -255,3 +255,79 @@ describe('the committed repos.json', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// REGRESSION: clone-URL validation.
+//
+// `git clone` is not a pure data operation. Some URL forms execute code, and a
+// leading "-" turns a positional into an option. The manifest is a committed
+// file that a pull request can edit, and `pnpm sync` hands its values to git on
+// a maintainer's machine, so an unvalidated `url` is remote code execution one
+// review-miss away.
+//
+// These tests exist so the validation cannot be quietly removed. The helpers
+// they exercise (ALLOWED_URL_PATTERN, isOptionLike, isAllowedUrl) were once
+// present in this module while `parseManifest` never called them — defined
+// guards that guarded nothing. Asserting through `parseManifest` rather than
+// through the helpers is the point: it pins the wiring, not just the predicate.
+// ---------------------------------------------------------------------------
+describe('clone URL validation', () => {
+  const withUrl = (url: string) =>
+    parsedError(parseManifest(document([{ name: 'mc-kernel', url, ref: SHA_A }])))
+
+  it('rejects an ext:: remote helper URL, which git would execute', () => {
+    expect(withUrl('ext::sh -c whoami')?._tag).toBe('InvalidUrl')
+  })
+
+  it.each([
+    ['--upload-pack=touch /tmp/pwned', 'an option-injecting value'],
+    ['-u', 'a short option'],
+  ])('rejects %s (%s)', (url) => {
+    expect(withUrl(url)?._tag).toBe('InvalidUrl')
+  })
+
+  it.each([
+    ['https://github.com/attacker/mc-kernel.git', 'a different org'],
+    ['https://gitlab.com/nerima-games/mc-kernel.git', 'a different host'],
+    ['http://github.com/nerima-games/mc-kernel.git', 'plain http'],
+    ['git@github.com:nerima-games/mc-kernel.git', 'an SSH remote'],
+    ['file:///tmp/evil', 'a local path'],
+    ['https://github.com/nerima-games/../../etc/passwd.git', 'path traversal'],
+    ['https://user:pw@github.com/nerima-games/mc-kernel.git', 'embedded credentials'],
+  ])('rejects %s (%s)', (url) => {
+    expect(withUrl(url)?._tag).toBe('InvalidUrl')
+  })
+
+  it('rejects a ref beginning with "-" even though it is not a valid SHA either', () => {
+    // Redundant with isValidRef today, and deliberately so: this assertion does
+    // not depend on PINNED_REF_PATTERN, so loosening that pattern later cannot
+    // reopen option injection without failing here.
+    const error = parsedError(
+      parseManifest(document([{ ...entry('mc-kernel'), ref: '--upload-pack=id' }])),
+    )
+    expect(error?._tag).toBe('InvalidRef')
+  })
+
+  it('rejects an entry whose URL points at a different repository than its name', () => {
+    const error = parsedError(
+      parseManifest(
+        document([{ name: 'mc-kernel', url: 'https://github.com/nerima-games/mc-noise.git', ref: SHA_A }]),
+      ),
+    )
+    expect(error?._tag).toBe('UrlNameMismatch')
+  })
+
+  it('accepts the one URL shape this workspace clones', () => {
+    expect(withUrl('https://github.com/nerima-games/mc-kernel.git')).toBeUndefined()
+  })
+
+  it('explains why a rejected URL was rejected, not merely that it was', () => {
+    const message = describeManifestError({
+      _tag: 'InvalidUrl',
+      name: 'mc-kernel',
+      url: 'ext::sh -c whoami',
+    })
+    expect(message).toContain('ext::sh')
+    expect(message).toContain('https://github.com/nerima-games/')
+  })
+})

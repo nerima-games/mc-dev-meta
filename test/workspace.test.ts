@@ -16,7 +16,14 @@ const SHA = 'a'.repeat(40)
 const manifestOf = (entries: ReadonlyArray<readonly [string, string]>): Manifest => {
   const raw = JSON.stringify({
     manifestVersion: 1,
-    repositories: entries.map(([name, ref]) => ({ name, url: `u/${name}`, ref })),
+    // A real clone URL, not a placeholder: `parseManifest` validates `url`
+    // because git executes some URL forms, so a fixture that would be rejected
+    // in production is not a fixture of anything.
+    repositories: entries.map(([name, ref]) => ({
+      name,
+      url: `https://github.com/nerima-games/${name}.git`,
+      ref,
+    })),
   })
   const parsed = parseManifest(raw)
   if (!parsed.ok) {
