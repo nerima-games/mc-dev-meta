@@ -66,6 +66,7 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 | `pnpm update:manifest:dry` | 差分が出るかだけ確認 |
 | `pnpm check:workspace` | clone 済みの各リポジトリで `pnpm verify` |
 | `pnpm check:workspace <script>` | 別のスクリプトを指定して横断実行 |
+| `pnpm check:api-window` | 各リポジトリの API が何日変わっていないかを報告（plan.md §6 Step 3 の 4 週間） |
 | `pnpm typecheck` | `tsconfig.build.json`(純粋層)と `tsconfig.test.json`(scripts + tests)を型検査 |
 | `pnpm lint` | oxlint(このリポジトリ唯一の lint / format 設定)。**`--deny-warnings` 付きで走る**ため、`warn` のルールもビルドを落とす（`oxlint.json` は 5 カテゴリすべてと個別 67 ルールが `warn`、`error` は 4 つだけ。このフラグが無かった頃は実質その 4 つしかゲートになっていなかった） |
 | `pnpm test` | vitest(**プレーン vitest**。`@effect/vitest` は使わない — 依存ゼロのため) |
