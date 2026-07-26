@@ -1,0 +1,15 @@
+# The whole point of this repository (plan.md §6 Step 0 item 2).
+#
+# The 15 game repositories are cloned into repos/ by `pnpm sync` and bound here
+# into ONE pnpm workspace. During development, `@nerima-games/*` dependencies
+# resolve through `workspace:*` — monorepo-equivalent DX with none of the
+# repositories actually being a monorepo.
+#
+# repos/ is gitignored. What is under version control is repos.json, which pins
+# each repository's revision; see docs/manifest.md for why that matters.
+#
+# NOTE: mc-dev-meta itself is deliberately NOT a workspace package. It is the
+# tool that fetches the others, so making it a member would mean bootstrapping
+# it from the packages it exists to fetch.
+packages:
+  - 'repos/*'

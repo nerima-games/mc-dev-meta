@@ -1,0 +1,80 @@
+{
+  "manifestVersion": 1,
+  "repositories": [
+    {
+      "name": "mc-kernel",
+      "url": "https://github.com/nerima-games/mc-kernel.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-noise",
+      "url": "https://github.com/nerima-games/mc-noise.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-meshing",
+      "url": "https://github.com/nerima-games/mc-meshing.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-physics",
+      "url": "https://github.com/nerima-games/mc-physics.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-save",
+      "url": "https://github.com/nerima-games/mc-save.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-audio",
+      "url": "https://github.com/nerima-games/mc-audio.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-worldgen",
+      "url": "https://github.com/nerima-games/mc-worldgen.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-sim",
+      "url": "https://github.com/nerima-games/mc-sim.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-render",
+      "url": "https://github.com/nerima-games/mc-render.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-playground-kit",
+      "url": "https://github.com/nerima-games/mc-playground-kit.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mx-gameplay",
+      "url": "https://github.com/nerima-games/mx-gameplay.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mx-redstone",
+      "url": "https://github.com/nerima-games/mx-redstone.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mx-ui",
+      "url": "https://github.com/nerima-games/mx-ui.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mx-multiplayer",
+      "url": "https://github.com/nerima-games/mx-multiplayer.git",
+      "ref": "unpinned"
+    },
+    {
+      "name": "mc-compose",
+      "url": "https://github.com/nerima-games/mc-compose.git",
+      "ref": "unpinned"
+    }
+  ]
+}

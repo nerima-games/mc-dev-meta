@@ -1,0 +1,12 @@
+{
+  // Scripts, tests and repo tooling. Node types are available here and only here.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // scripts/ uses top-level `await` at module scope.
+    "target": "ES2024",
+    "module": "ESNext"
+  },
+  "include": ["index.ts", "domain/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "repos", "coverage", "dist"]
+}

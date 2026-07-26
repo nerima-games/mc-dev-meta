@@ -1,0 +1,21 @@
+{
+  // The pure layer only. `types: []` (inherited from tsconfig.base.json) is
+  // deliberate and load-bearing: it is what keeps `domain/` free of Node
+  // globals, which is what lets the sync decision be unit-tested with no
+  // filesystem, no git and no network.
+  //
+  // Everything that touches the outside world lives in `scripts/` and is
+  // checked by tsconfig.test.json, where `types: ["node"]` is available.
+  "extends": "./tsconfig.base.json",
+  "include": ["index.ts", "domain/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "repos",
+    "coverage",
+    "dist",
+    "test/**",
+    "scripts/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}
