@@ -54,6 +54,42 @@ $ pnpm install          # ここで repos/* が workspace として解決され�
 1 回目は `repos/` が空なので workspace メンバーがおらず、
 2 回目で `@nerima-games/*` の相互依存が `workspace:*` として解決される。
 
+### 2.1 `pnpm-lock.yaml` は commit されない
+
+**この 2 回目の `pnpm install` は `pnpm-lock.yaml` を書き換える。だから gitignore してある。**
+
+`pnpm-workspace.yaml` が `repos/*` を束ねている以上、workspace ルートの lockfile は
+16 プロジェクト分をまとめて記述する。そして `repos/` は gitignore されているので、
+**その中身は「`pnpm install` した時点で `repos/` がどこまで存在したか」の関数になる**:
+
+| `repos/` の状態 | lockfile |
+| --- | --- |
+| 空(clone 直後、および CI) | 1602 行、importer は `.` のみ |
+| 揃っている(`pnpm sync` の後) | 2059 行、importer は `.` + 15 件 |
+
+`pnpm install` はどちらの向きにも書き換える。
+つまりどちらを commit しても、上の §2 の手順を踏んだだけで作業ツリーが dirty になり、
+しかも次の `pnpm install` が元に戻すので**恒久的に dirty になる**。
+情報量が無い diff を毎回突きつけられる状態は、いずれ「とりあえず commit」に負ける。
+
+pin が必要なものは、それぞれ**あるべき場所**で pin されている:
+
+- 15 リポジトリの合成状態 → `repos.json`(このリポジトリに commit)
+- 各リポジトリ自身の依存 → `repos/<name>/pnpm-lock.yaml`(そのリポジトリに commit)
+
+workspace ルートの lockfile は、そのどちらでもない。
+**ソースがこのリポジトリに無いパッケージを pin しているだけ**である。
+
+代替案(`shared-workspace-lockfile=false` で mc-dev-meta 自身の依存だけの lockfile を持つ)は
+**試したうえで却下した**。pnpm が clone 済みの各リポジトリの中に lockfile を書き込むようになり、
+管理下のリポジトリ同士が依存し始めた瞬間 — つまりこの workspace の存在理由が効き始めた瞬間 —
+そこに `link:../mc-kernel` という、この workspace の中でしか意味を持たない版が書かれる。
+15 個の clone がすべて dirty になり、`pnpm sync` はそれを全部スキップする。
+理由と実測は `.gitignore` のコメントにある。
+
+代償は CI が `--frozen-lockfile` を使えないことである。
+`.github/workflows/ci.yaml` にその損得を書いてある。
+
 ## 3. 日々の流れ
 
 ### 3.1 複数リポジトリにまたがる変更
@@ -115,7 +151,20 @@ $ pnpm install
 | ある / clean / pin と HEAD が一致 | 何もしない |
 | ある / clean / pin がローカルに無い | **fetch** して再判定 |
 | ある / clean / pin がローカルにある | **detached checkout** |
-| ある / clean / `repos.json` が `unpinned` | **fetch のみ。HEAD は動かさない** |
+| ある / clean / `repos.json` が `unpinned` | **1 回だけ fetch。HEAD は動かさない** |
+| ある / clean / `unpinned` / この run で fetch 済み | 何もしない |
+
+`unpinned` の「1 回だけ」は数え方の話ではなく、**1 run あたりの往復回数**の話である。
+pin されたエントリは「ref に着いた」ことで収束できるが、`unpinned` には着くべき ref が無い。
+そのため以前は同じ状態に対して `Fetch` を返し続け、収束ループの上限(3)まで fetch していた。
+`repos.json` が 15 件すべて `unpinned` の初期状態では、`pnpm sync` 1 回で
+**45 往復**していたことになる。いまは `WorkingCopyState.fetchedThisRun` が
+「この run ではもう remote に訊いた」を持ち回るので、1 リポジトリにつき最大 1 往復である。
+
+pin 済みのエントリなら、2 回目の `pnpm sync` は git コマンドを 1 つも打たない。
+`unpinned` のエントリは 2 回目の run でももう一度だけ fetch する —
+比較すべき pin が無い以上、「最新かどうか」は remote に訊かなければ分からないからである。
+作業ツリーには依然として一切触れない。
 
 **`git reset --hard` も `git clean` も `git restore` も実行しない。**
 そもそもそういうアクションが存在せず、さらに実行直前に引数を検査して拒否する。
@@ -194,6 +243,7 @@ publish が始まっても要る。ただし役割は変わる:
 | やってはいけない | 理由 |
 | --- | --- |
 | `repos/` をコミットする | 15 リポジトリを 16 個目にベンダリングすることになり、分割の意味が消える |
+| `pnpm-lock.yaml` を commit する(gitignore を外す) | 中身が `repos/` の有無で変わるので、どちらを commit しても恒久的に dirty になる。§2.1 |
 | mc-dev-meta を workspace メンバーにする(`packages: ['.']`) | 自分が取ってくるパッケージから自分をブートストラップすることになる |
 | mc-dev-meta に依存を足す | 同上。**依存はゼロ**であり、`effect` すら入れない |
 | `repos/` の中で `git reset --hard` を打つ | このツールがやらないことを手でやることになる。やるなら意識してやること |

@@ -30,12 +30,30 @@ jobs:
         with:
           node-version: "22"
           cache: "pnpm"
+          # pnpm-lock.yaml is gitignored — see .gitignore for why a
+          # workspace-root lockfile describing gitignored packages is not a
+          # committable artefact. The pnpm store cache therefore keys on
+          # package.json; without this input setup-node looks for a lockfile,
+          # finds none, and fails the step.
+          cache-dependency-path: package.json
 
       - name: Install dependencies
         # --ignore-scripts: pnpm 9 runs postinstall, and a fork PR can edit
         # package.json and the lockfile consistently and still satisfy
-        # --frozen-lockfile. Nothing here needs a lifecycle script.
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        # --frozen-lockfile. Nothing here needs a lifecycle script. This is the
+        # check that actually protects the runner, and it is unaffected by the
+        # line below.
+        #
+        # No --frozen-lockfile: there is no committed lockfile to be frozen
+        # against. The honest cost is that a CI run resolves devDependencies
+        # afresh, so a bad release inside the caret ranges in package.json can
+        # turn this workflow red on a day nothing here changed. That is a real
+        # cost and it is accepted deliberately: the alternative was committing a
+        # file that is dirty on every developer's machine by construction. If
+        # this floats often enough to be annoying, pin the six devDependencies
+        # to exact versions in package.json — that is the fix, not un-ignoring
+        # the lockfile.
+        run: pnpm install --ignore-scripts
 
       - name: Type check
         run: pnpm typecheck

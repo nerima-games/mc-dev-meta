@@ -50,6 +50,12 @@ $ pnpm install          # ここで repos/* が workspace として解決され�
 1 回目は `repos/` が空なので workspace メンバーがおらず、
 2 回目で `@nerima-games/*` の相互依存が `workspace:*` として解決される。
 
+**`pnpm-lock.yaml` は gitignore してある。** workspace ルートの lockfile は
+`repos/` がどこまで存在するかで中身が変わる(空なら 1602 行、揃っていれば 2059 行)ので、
+どちらを commit しても上の手順を踏むだけで恒久的に dirty になる。
+pin すべきものは `repos.json` と各リポジトリ自身の lockfile にある。
+理由の全文は [docs/workflow.md](./docs/workflow.md) §2.1 と `.gitignore` のコメント。
+
 ## コマンド
 
 | コマンド | 内容 |
@@ -147,10 +153,11 @@ oxlint 0.12 は `no-restricted-syntax` も `no-restricted-properties` も実装�
 
 **このリポジトリはまだ叩き台(pre-audit first cut)である。**
 
-- **`repos.json` の 15 件はすべて `"unpinned"`。** 15 リポジトリのほとんどがまだ存在しないため。
-  架空の SHA で埋めるより、そう書いてあるほうがよい。
-  `pnpm check:workspace` が毎回この状態を報告する
-- **`repos/` は空。** `pnpm sync` が実際に動くのは、リポジトリが GitHub に作られてから
+- **`repos.json` の 15 件は実 SHA に固定済み。** 15 リポジトリが GitHub 上に作成された後、
+  `pnpm update:manifest` で固定した。それ以前は全件 `"unpinned"` だった —— 架空の SHA で
+  埋めるより、存在しないと書いてあるほうがよいため
+- **`pnpm sync` は実リモートに対して検証済み。** 15 件の clone、2 回目以降は no-op。
+  以前は未固定エントリが毎回 3 回 fetch していた(45 往復)
 - **ロスターの publish は未実装。** 現在は 16 リポジトリが手作業でミラーしている
 - **changesets 運用は未決**(plan.md §9 の「パッケージ公開先」も未決)
 - **カバレッジ閾値は未設定。** 99% ゲートは完成条件到達時に有効化する

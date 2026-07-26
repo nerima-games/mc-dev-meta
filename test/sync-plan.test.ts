@@ -4,6 +4,7 @@ import {
   applyAction,
   DESTRUCTIVE_GIT_ARGUMENTS,
   describeAction,
+  fetchesFromRemote,
   gitCommandsFor,
   isDestructiveGitCommand,
   isNoOp,
@@ -28,19 +29,19 @@ const unpinned: ManifestEntry = { ...pinned, ref: UNPINNED }
 
 const absent: WorkingCopyState = { _tag: 'Absent' }
 
-const present = (
-  overrides: Partial<Extract<WorkingCopyState, { _tag: 'Present' }>> = {},
-): WorkingCopyState => ({
+type PresentState = Extract<WorkingCopyState, { _tag: 'Present' }>
+
+const present = (overrides: Partial<PresentState> = {}): PresentState => ({
   _tag: 'Present',
   head: SHA_A,
   dirty: false,
   hasPinnedRef: true,
+  fetchedThisRun: false,
   ...overrides,
 })
 
-/** Every observable state, for the exhaustive safety sweeps below. */
-const EVERY_STATE: ReadonlyArray<WorkingCopyState> = [
-  absent,
+/** Every state that can be read off a working copy. */
+const EVERY_OBSERVED_STATE: ReadonlyArray<PresentState> = [
   present({ head: SHA_A, dirty: false, hasPinnedRef: true }),
   present({ head: SHA_A, dirty: false, hasPinnedRef: false }),
   present({ head: SHA_A, dirty: true, hasPinnedRef: true }),
@@ -50,6 +51,18 @@ const EVERY_STATE: ReadonlyArray<WorkingCopyState> = [
   present({ head: SHA_B, dirty: true, hasPinnedRef: true }),
   present({ head: SHA_B, dirty: true, hasPinnedRef: false }),
   present({ head: '', dirty: true, hasPinnedRef: false }),
+]
+
+/**
+ * Every observable state, for the exhaustive safety sweeps below.
+ *
+ * `fetchedThisRun` is not read off the disk, so it doubles every observed state
+ * rather than replacing any: each one can be reached both before and after this
+ * run has contacted the remote, and the sweeps have to cover both.
+ */
+const EVERY_STATE: ReadonlyArray<WorkingCopyState> = [
+  absent,
+  ...EVERY_OBSERVED_STATE.flatMap((state) => [state, { ...state, fetchedThisRun: true }]),
 ]
 
 const EVERY_ENTRY: ReadonlyArray<ManifestEntry> = [pinned, unpinned]
@@ -140,6 +153,32 @@ describe('an unpinned entry is fetched but never checked out', () => {
       'NOT moving HEAD',
     )
   })
+
+  // REGRESSION: this branch used to answer `Fetch` from EVERY clean state,
+  // including one it had just fetched, so the caller's convergence loop ran the
+  // fetch again on every round. With `repos.json` shipping 15 unpinned entries
+  // and a 3-round loop that was 45 network round-trips per `pnpm sync`.
+  it('asks for a fetch once per run and then says there is nothing to do', () => {
+    expect(planSync(unpinned, present({ head: SHA_B, fetchedThisRun: false }))._tag).toBe('Fetch')
+    expect(planSync(unpinned, present({ head: SHA_B, fetchedThisRun: true }))._tag).toBe('UpToDate')
+  })
+
+  it('treats the clone that created the working copy as the fetch', () => {
+    const cloned = applyAction(unpinned, absent, planSync(unpinned, absent))
+    expect(planSync(unpinned, cloned)._tag).toBe('UpToDate')
+  })
+
+  it('runs no git command once it is up to date, and still never moves HEAD', () => {
+    const action = planSync(unpinned, present({ head: SHA_B, fetchedThisRun: true }))
+    expect(gitCommandsFor(action, 'repos/mc-kernel')).toStrictEqual([])
+    expect(isNoOp(action)).toBe(true)
+  })
+
+  it('counts an up-to-date unpinned entry as unchanged rather than fetched', () => {
+    const summary = summarise([{ _tag: 'UpToDate', name: 'mc-kernel' }])
+    expect(summary.unchanged).toStrictEqual(['mc-kernel'])
+    expect(summary.fetched).toStrictEqual([])
+  })
 })
 
 describe('no reachable git command can destroy work', () => {
@@ -213,11 +252,35 @@ describe('idempotence', () => {
     ])
   })
 
-  it('reaches a no-op from every state, for a pinned entry', () => {
-    for (const state of EVERY_STATE) {
-      const { actions } = settle(pinned, state)
-      const last = actions[actions.length - 1]
-      expect(last === undefined ? undefined : isNoOp(last), JSON.stringify(state)).toBe(true)
+  // REGRESSION — this used to say "for a pinned entry", and the scope was the
+  // bug: unpinned entries were excluded because they DID NOT reach a no-op,
+  // and narrowing the invariant is how that survived. It holds for every entry
+  // now, and settling has to be what ends the loop rather than the round limit,
+  // so `maxRounds` is set well above what any entry should need.
+  it('reaches a no-op from every state, for every entry', () => {
+    for (const entry of EVERY_ENTRY) {
+      for (const state of EVERY_STATE) {
+        const { actions } = settle(entry, state, 10)
+        const last = actions[actions.length - 1]
+        expect(
+          last === undefined ? undefined : isNoOp(last),
+          JSON.stringify({ ref: entry.ref, state }),
+        ).toBe(true)
+      }
+    }
+  })
+
+  // The counterpart of the above: reaching a no-op is worthless if it takes
+  // five fetches to get there. Nothing needs more than one round-trip.
+  it('contacts the remote at most once per entry, from every state', () => {
+    for (const entry of EVERY_ENTRY) {
+      for (const state of EVERY_STATE) {
+        const { actions } = settle(entry, state, 10)
+        expect(
+          actions.filter(fetchesFromRemote).length,
+          JSON.stringify({ ref: entry.ref, state }),
+        ).toBeLessThanOrEqual(1)
+      }
     }
   })
 
@@ -228,15 +291,35 @@ describe('idempotence', () => {
     expect(state).toStrictEqual(dirty)
   })
 
-  // An unpinned entry fetches once and then has nothing more to do — but it
-  // never becomes AlreadyAtRef, because there is no ref to be at. The loop
-  // guard is what stops it spinning.
-  it('does not loop forever on an unpinned entry', () => {
-    const { actions } = settle(unpinned, present({ head: SHA_B }), 3)
-    expect(actions).toHaveLength(3)
-    for (const action of actions) {
-      expect(action._tag).toBe('Fetch')
-    }
+  // REGRESSION: an unpinned entry never becomes AlreadyAtRef, because there is
+  // no ref to be at. It used to have no other way of being finished either, so
+  // it re-fetched on every round and only the loop guard stopped it — three
+  // round-trips per repository, fifteen repositories, every `pnpm sync`. It
+  // settles as UpToDate now, and the round limit is no longer load-bearing:
+  // this asserts it with maxRounds far above what the entry may use.
+  it('settles an unpinned entry after exactly one fetch', () => {
+    const { actions } = settle(unpinned, present({ head: SHA_B }), 10)
+    expect(actions.map((action) => action._tag)).toStrictEqual(['Fetch', 'UpToDate'])
+    expect(summarise(actions).fetched).toStrictEqual(['mc-kernel'])
+  })
+
+  it('settles a fresh unpinned clone with no fetch at all', () => {
+    const { actions } = settle(unpinned, absent, 10)
+    expect(actions.map((action) => action._tag)).toStrictEqual(['Clone', 'UpToDate'])
+    expect(summarise(actions).fetched).toStrictEqual([])
+  })
+
+  // The second `pnpm sync` of the day. A pinned entry does nothing; an unpinned
+  // one asks the remote once more, because there is no pinned ref against which
+  // "already up to date" could be decided without asking. What it must never do
+  // is ask more than once, which is what the run before it did three times.
+  it('re-fetches an unpinned entry once on a later run, never more', () => {
+    const first = settle(unpinned, present({ head: SHA_B }), 10)
+    const laterRun: WorkingCopyState = { ...present({ head: SHA_B }), fetchedThisRun: false }
+    expect(first.state).toStrictEqual({ ...present({ head: SHA_B }), fetchedThisRun: true })
+
+    const second = settle(unpinned, laterRun, 10)
+    expect(second.actions.map((action) => action._tag)).toStrictEqual(['Fetch', 'UpToDate'])
   })
 })
 
@@ -283,7 +366,7 @@ describe('the model of what the script does', () => {
   it('models a fetch as making objects local without moving HEAD', () => {
     const before = present({ head: SHA_B, hasPinnedRef: false })
     const after = applyAction(pinned, before, { _tag: 'Fetch', name: 'mc-kernel', reason: 'ref-not-local' })
-    expect(after).toStrictEqual(present({ head: SHA_B, hasPinnedRef: true }))
+    expect(after).toStrictEqual(present({ head: SHA_B, hasPinnedRef: true, fetchedThisRun: true }))
   })
 
   it('models a checkout as moving HEAD and nothing else', () => {
@@ -297,9 +380,33 @@ describe('the model of what the script does', () => {
     const noOps: ReadonlyArray<SyncAction> = [
       { _tag: 'SkipDirty', name: 'mc-kernel' },
       { _tag: 'AlreadyAtRef', name: 'mc-kernel', ref: SHA_A },
+      { _tag: 'UpToDate', name: 'mc-kernel' },
     ]
     for (const action of noOps) {
       expect(applyAction(pinned, dirty, action)).toStrictEqual(dirty)
+    }
+  })
+
+  // `scripts/sync-repos.ts` re-observes the working copy after every action and
+  // has to decide `fetchedThisRun` itself, because nothing on disk records it.
+  // It uses `fetchesFromRemote`; this pins that the model agrees, so the script
+  // and the model cannot drift on the one field the script has to supply.
+  it('agrees with fetchesFromRemote about which actions contact the remote', () => {
+    const clean = present({ head: SHA_B, fetchedThisRun: false })
+    const actions: ReadonlyArray<SyncAction> = [
+      { _tag: 'Clone', name: 'mc-kernel', url: pinned.url, ref: SHA_A },
+      { _tag: 'Fetch', name: 'mc-kernel', reason: 'ref-not-local' },
+      { _tag: 'Fetch', name: 'mc-kernel', reason: 'unpinned' },
+      { _tag: 'Checkout', name: 'mc-kernel', ref: SHA_A },
+      { _tag: 'AlreadyAtRef', name: 'mc-kernel', ref: SHA_A },
+      { _tag: 'UpToDate', name: 'mc-kernel' },
+      { _tag: 'SkipDirty', name: 'mc-kernel' },
+    ]
+    for (const action of actions) {
+      const after = applyAction(pinned, clean, action)
+      expect(after._tag === 'Present' && after.fetchedThisRun, action._tag).toBe(
+        fetchesFromRemote(action),
+      )
     }
   })
 })

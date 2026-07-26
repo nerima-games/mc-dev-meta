@@ -25,6 +25,48 @@ repos/
 node_modules/
 .pnpm-store/
 
+# THE WORKSPACE-ROOT LOCKFILE.
+#
+# Not committed, because its contents are not a property of THIS repository.
+#
+# `pnpm-workspace.yaml` binds `repos/*` into this workspace, so a single
+# workspace-root lockfile describes all 16 projects at once. `repos/` is
+# gitignored (above), which means the file's contents depend on how much of
+# `repos/` happened to exist when `pnpm install` last ran:
+#
+#   repos/ empty (a fresh clone, and CI)  -> 1602 lines, importers: `.`
+#   repos/ populated (after `pnpm sync`)  -> 2059 lines, importers: `.` + 15
+#
+# Measured, not guessed. `pnpm install` rewrites it in whichever direction it
+# finds, so whichever version were committed, one of the two documented setup
+# steps in docs/workflow.md §2 would leave the working tree dirty — permanently,
+# because the next `pnpm install` puts it back. That is a booby trap, not an
+# artefact: the diff carries no information anyone can act on, and the pressure
+# is always to commit it and move on.
+#
+# It would also be pinning packages whose SOURCE IS NOT IN THIS REPOSITORY and
+# whose resolved versions change every time `pnpm update:manifest` re-pins. The
+# things that genuinely need pinning are pinned where they belong:
+#
+#   - the composite state of the 15 repositories -> repos.json (committed here)
+#   - each repository's own dependencies         -> repos/<name>/pnpm-lock.yaml,
+#     committed in that repository, by that repository's CI
+#
+# The alternative — `shared-workspace-lockfile=false`, giving mc-dev-meta's own
+# dependencies a root lockfile with no `repos/*` importers — was tried and
+# rejected. It makes pnpm write a lockfile INTO each cloned repository, and once
+# the managed repositories depend on each other (which is the entire point of
+# this workspace) the version it writes there is `link:../mc-kernel`, which is
+# meaningful only inside this workspace. Verified: adding a `workspace:*`
+# dependency rewrote `repos/mc-noise/pnpm-lock.yaml`. That would leave all 15
+# clones dirty, and `pnpm sync` skips dirty repositories — the tool's own safety
+# rule firing on damage the tool caused. A trap costing 457 lines is not worth
+# trading for one that disables synchronisation entirely.
+#
+# The cost of this line is that CI cannot use `--frozen-lockfile`. See
+# .github/workflows/ci.yaml, which says what that does and does not buy.
+pnpm-lock.yaml
+
 # Build outputs (none yet — the build pipeline is added at completion)
 dist/
 build/

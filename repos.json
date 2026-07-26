@@ -4,77 +4,77 @@
     {
       "name": "mc-kernel",
       "url": "https://github.com/nerima-games/mc-kernel.git",
-      "ref": "unpinned"
+      "ref": "f4dfc4a3645311ddee11c11f8c6987fab852517d"
     },
     {
       "name": "mc-noise",
       "url": "https://github.com/nerima-games/mc-noise.git",
-      "ref": "unpinned"
+      "ref": "4ad49d0bf0465a05973e7e0f5bff4c9b2986b209"
     },
     {
       "name": "mc-meshing",
       "url": "https://github.com/nerima-games/mc-meshing.git",
-      "ref": "unpinned"
+      "ref": "d3e80fcad9c79e7a4aa9f6938e08426c83a19554"
     },
     {
       "name": "mc-physics",
       "url": "https://github.com/nerima-games/mc-physics.git",
-      "ref": "unpinned"
+      "ref": "041f1e8b53856d468430d65160b5ecab2cf90341"
     },
     {
       "name": "mc-save",
       "url": "https://github.com/nerima-games/mc-save.git",
-      "ref": "unpinned"
+      "ref": "dad5a34f53e53be4770c845c6fc71b63bc62a5f7"
     },
     {
       "name": "mc-audio",
       "url": "https://github.com/nerima-games/mc-audio.git",
-      "ref": "unpinned"
+      "ref": "99a71bfc71f5c16ba957cd25e37a1eaed59258ba"
     },
     {
       "name": "mc-worldgen",
       "url": "https://github.com/nerima-games/mc-worldgen.git",
-      "ref": "unpinned"
+      "ref": "d004e24a08872ae232091ff06692ea81d18f62f4"
     },
     {
       "name": "mc-sim",
       "url": "https://github.com/nerima-games/mc-sim.git",
-      "ref": "unpinned"
+      "ref": "5516305c09adcfbe04338bbdc1f85e3051c219d9"
     },
     {
       "name": "mc-render",
       "url": "https://github.com/nerima-games/mc-render.git",
-      "ref": "unpinned"
+      "ref": "77448c6607e254d9ba6efc62ed07f56a18800dce"
     },
     {
       "name": "mc-playground-kit",
       "url": "https://github.com/nerima-games/mc-playground-kit.git",
-      "ref": "unpinned"
+      "ref": "6432bba870f73579d58956f3c3f4f4f641dca811"
     },
     {
       "name": "mx-gameplay",
       "url": "https://github.com/nerima-games/mx-gameplay.git",
-      "ref": "unpinned"
+      "ref": "5fc67a8a29cfbed223544af267ba93c1dd2f24fa"
     },
     {
       "name": "mx-redstone",
       "url": "https://github.com/nerima-games/mx-redstone.git",
-      "ref": "unpinned"
+      "ref": "2ba2781b0626a2b542462babbfe9e6b96a3d0066"
     },
     {
       "name": "mx-ui",
       "url": "https://github.com/nerima-games/mx-ui.git",
-      "ref": "unpinned"
+      "ref": "57878fdfeb90b5a44ea47836cdfd586e545cc8ae"
     },
     {
       "name": "mx-multiplayer",
       "url": "https://github.com/nerima-games/mx-multiplayer.git",
-      "ref": "unpinned"
+      "ref": "2b8fae5eced6380fcf22c860176a23dd599879dd"
     },
     {
       "name": "mc-compose",
       "url": "https://github.com/nerima-games/mc-compose.git",
-      "ref": "unpinned"
+      "ref": "829ff38cbcb4bf224084c6910fcb20084ac17b43"
     }
   ]
 }

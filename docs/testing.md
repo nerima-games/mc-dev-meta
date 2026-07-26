@@ -41,12 +41,18 @@
 `test/sync-plan.test.ts` は観測可能な状態を明示的に列挙する:
 
 ```typescript
-const EVERY_STATE: ReadonlyArray<WorkingCopyState> = [
-  absent,
+const EVERY_OBSERVED_STATE: ReadonlyArray<PresentState> = [
   present({ head: SHA_A, dirty: false, hasPinnedRef: true }),
   present({ head: SHA_A, dirty: false, hasPinnedRef: false }),
   present({ head: SHA_A, dirty: true,  hasPinnedRef: true }),
   ...
+]
+
+// `fetchedThisRun` はディスクから読めないので、観測できる状態を置き換えるのではなく
+// 倍にする。同じ状態に「remote に訊く前」と「訊いた後」の両方で到達しうる。
+const EVERY_STATE: ReadonlyArray<WorkingCopyState> = [
+  absent,
+  ...EVERY_OBSERVED_STATE.flatMap((state) => [state, { ...state, fetchedThisRun: true }]),
 ]
 ```
 
@@ -59,7 +65,13 @@ const EVERY_STATE: ReadonlyArray<WorkingCopyState> = [
 | `emits no git reset, git clean or git restore at all` | 上の別角度からの確認 |
 | `always checks out detached, so no local branch is moved or created` | `--detach` の強制 |
 | `never emits a Checkout for an unpinned entry, from any state` | `unpinned` は HEAD を動かさない |
-| `reaches a no-op from every state, for a pinned entry` | どこからでも収束する |
+| `reaches a no-op from every state, for every entry` | どこからでも収束する |
+| `contacts the remote at most once per entry, from every state` | 収束にかかる往復が 1 回以下 |
+
+下 2 つはもともと 1 つで、しかも **`for a pinned entry` と限定されていた**。
+その限定こそがバグだった — `unpinned` は収束しなかったので、
+不変条件のほうを狭めることで通していた。いまは全エントリで成り立つ。
+「収束する」だけでは足りないので、往復回数の上限を測るテストを対にしてある。
 
 ### 3.2 冪等性はモデルに対して検証する
 
@@ -96,11 +108,17 @@ expect(second.actions.map(a => a._tag)).toStrictEqual(['AlreadyAtRef'])
 ```typescript
 // git status が読めなかったら dirty とみなす
 if (!status.ok || !head.ok) {
-  return { _tag: 'Present', head: '', dirty: true, hasPinnedRef: false }
+  return { _tag: 'Present', head: '', dirty: true, hasPinnedRef: false, fetchedThisRun }
 }
 ```
 
 作業を守るのが仕事の検査は、fail closed が唯一安全な既定値である。
+
+`fetchedThisRun` は観測ではなく引数として渡ってくる(ディスクに記録が無いため)。
+`scripts/sync-repos.ts` はこれを `actions.some(fetchesFromRemote)` から決めており、
+その決め方が `applyAction` のモデルと一致することは
+`agrees with fetchesFromRemote about which actions contact the remote` が押さえている。
+スクリプトが自分で埋める唯一のフィールドなので、そこだけはモデルと突き合わせてある。
 
 ## 5. コミット済みファイルに対するテスト
 

@@ -67,11 +67,18 @@
 clean な木に対してでも、前者は「開発者がいたローカルブランチ」を動かしうる。
 後者はローカルブランチを作りも動かしもしない。
 
-### 3.3 `unpinned` は fetch のみ
+### 3.3 `unpinned` は fetch のみ、しかも 1 run に 1 回
 
 `repos.json` の ref が `"unpinned"` のとき、**HEAD は絶対に動かさない**。
 `unpinned` は「どこにいるべきか誰も決めていない」の意味であり、
 動かすことは推測になる。推測は、開発者が意図して checkout していたコミットを黙って捨てる。
+
+そのうえで、fetch は **1 run につき 1 リポジトリ 1 回**である。
+pin されたエントリは「ref に着いた」ことで終われるが、`unpinned` には着くべき ref が無い。
+終わり方を別に用意しないと、判断関数は同じ状態に対して `Fetch` を返し続け、
+収束ループが上限まで回る。それが `SyncAction` に `UpToDate` があり
+`WorkingCopyState` に `fetchedThisRun` がある理由である
+([public-api.md](./public-api.md) §3)。
 
 ## 4. 持たないもの
 

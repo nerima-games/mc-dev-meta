@@ -26,10 +26,21 @@
  * Idempotence
  * ---------------------------------------------------------------------------
  *
- * Running this twice in a row does nothing the second time. That property is
- * not asserted here — it is asserted in `test/sync-plan.test.ts` against
- * `applyAction`, which models what this script does. If the two ever diverge,
- * THIS FILE is what is wrong.
+ * Running this twice in a row does nothing the second time, for every PINNED
+ * entry: the second run reports `unchanged` and issues no git command at all.
+ *
+ * An UNPINNED entry is the one honest exception, and it is bounded: it fetches
+ * ONCE per run and never touches the working tree. It cannot do less — there is
+ * no pinned ref to compare HEAD against, so "up to date" is not a question that
+ * can be answered without asking the remote — and it must not do more. It used
+ * to do more: `planSync` answered `Fetch` to a state it had just fetched, and
+ * the loop below obliged three times over, which made an out-of-the-box
+ * `pnpm sync` (15 unpinned entries) 45 network round-trips. See
+ * `WorkingCopyState.fetchedThisRun` in `domain/sync-plan.ts`.
+ *
+ * Neither property is asserted here — both are asserted in
+ * `test/sync-plan.test.ts` against `applyAction`, which models what this script
+ * does. If the two ever diverge, THIS FILE is what is wrong.
  *
  * Usage:
  *   pnpm sync              clone/fetch/checkout per repos.json
@@ -50,6 +61,7 @@ import {
 import { MANAGED_REPOSITORY_NAMES } from '../domain/repository-roster'
 import {
   describeAction,
+  fetchesFromRemote,
   gitCommandsFor,
   isDestructiveGitCommand,
   isNoOp,
@@ -66,7 +78,16 @@ const rootDir = process.cwd()
 
 const isDryRun = process.argv.includes('--dry-run')
 
-/** At most two rounds are ever needed (fetch, then checkout); 3 is the loop guard. */
+/**
+ * At most two rounds of work are ever needed (fetch, then checkout), plus the
+ * round that observes there is nothing left; 3 is the loop guard.
+ *
+ * It is a guard against a bug in `domain/sync-plan.ts`, NOT the thing that
+ * terminates the loop. Every entry — unpinned ones included — reaches a no-op
+ * on its own, which is what `test/sync-plan.test.ts` asserts over every entry x
+ * every state. If this limit is ever what stops a repository, the planner is
+ * wrong and the symptom is wasted network round-trips.
+ */
 const MAX_ROUNDS = 3
 
 type GitResult = { readonly ok: true; readonly stdout: string } | { readonly ok: false; readonly detail: string }
@@ -107,8 +128,18 @@ const directoryExists = async (at: string): Promise<boolean> => {
   return info?.isDirectory() === true
 }
 
-/** Observe one working copy. Read-only: nothing here writes. */
-const observe = async (entry: ManifestEntry): Promise<WorkingCopyState> => {
+/**
+ * Observe one working copy. Read-only: nothing here writes.
+ *
+ * `fetchedThisRun` is passed in rather than discovered, because it is not a
+ * property of the working copy — nothing on disk records that this process
+ * fetched this repository a moment ago. The caller is the only thing that
+ * knows, and the loop below is the only scope in which the answer is useful.
+ */
+const observe = async (
+  entry: ManifestEntry,
+  fetchedThisRun: boolean,
+): Promise<WorkingCopyState> => {
   const directory = path.join(REPOS_DIRECTORY, entry.name)
 
   if (!(await directoryExists(path.join(rootDir, directory, '.git')))) {
@@ -122,7 +153,7 @@ const observe = async (entry: ManifestEntry): Promise<WorkingCopyState> => {
   // closed is the only safe default for a check whose whole job is to protect
   // uncommitted work.
   if (!status.ok || !head.ok) {
-    return { _tag: 'Present', head: '', dirty: true, hasPinnedRef: false }
+    return { _tag: 'Present', head: '', dirty: true, hasPinnedRef: false, fetchedThisRun }
   }
 
   const hasPinnedRef = isPinned(entry.ref)
@@ -134,6 +165,7 @@ const observe = async (entry: ManifestEntry): Promise<WorkingCopyState> => {
     head: head.stdout.trim(),
     dirty: status.stdout.trim().length > 0,
     hasPinnedRef,
+    fetchedThisRun,
   }
 }
 
@@ -146,7 +178,7 @@ type RepositoryOutcome = {
 const syncOne = async (entry: ManifestEntry): Promise<RepositoryOutcome> => {
   const directory = path.join(REPOS_DIRECTORY, entry.name)
   const actions: Array<SyncAction> = []
-  let state = await observe(entry)
+  let state = await observe(entry, false)
 
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
     const action = planSync(entry, state)
@@ -168,7 +200,10 @@ const syncOne = async (entry: ManifestEntry): Promise<RepositoryOutcome> => {
       return { name: entry.name, actions, failure: firstFailure.detail }
     }
 
-    state = await observe(entry)
+    // Every action in `actions` has now run without failing — a failure returns
+    // above — so "has this run talked to the remote yet" is exactly a question
+    // about the actions taken so far.
+    state = await observe(entry, actions.some(fetchesFromRemote))
   }
 
   return { name: entry.name, actions, failure: undefined }

@@ -50,6 +50,24 @@ export type WorkingCopyState =
       readonly dirty: boolean
       /** True if the manifest's pinned ref already exists in the local object store. */
       readonly hasPinnedRef: boolean
+      /**
+       * True once THIS RUN has already contacted the remote for this repository
+       * — by a `Fetch`, or by the `Clone` that created the working copy.
+       *
+       * Unlike the three fields above, this is not read off the disk: nothing in
+       * a working copy records "somebody fetched me eleven seconds ago". It is
+       * carried by the caller across the rounds of one run, which is exactly the
+       * scope in which it is true.
+       *
+       * It exists because an UNPINNED entry has no other way to be finished.
+       * A pinned entry converges by arriving at its ref; an unpinned entry has
+       * no ref to arrive at, so without this flag `planSync` would answer
+       * `Fetch` to the same question forever and the convergence loop would
+       * fetch as many times as its round limit allowed. That is precisely the
+       * bug this field was added to close: three network round-trips per
+       * unpinned repository, on every single `pnpm sync`.
+       */
+      readonly fetchedThisRun: boolean
     }
 
 export type SyncAction =
@@ -61,6 +79,14 @@ export type SyncAction =
   | { readonly _tag: 'Checkout'; readonly name: string; readonly ref: string }
   /** There, clean, HEAD already equals the pinned ref. Do nothing. */
   | { readonly _tag: 'AlreadyAtRef'; readonly name: string; readonly ref: string }
+  /**
+   * Unpinned, clean, and already fetched in this run. Nothing left to do.
+   *
+   * The unpinned counterpart of `AlreadyAtRef`. An unpinned entry can never be
+   * "at its ref" — there is no ref — so it needs its own way of saying "done",
+   * or it never stops asking to be fetched.
+   */
+  | { readonly _tag: 'UpToDate'; readonly name: string }
   /** There, DIRTY. Do not touch it. Not an error. */
   | { readonly _tag: 'SkipDirty'; readonly name: string }
 
@@ -85,8 +111,14 @@ export const planSync = (entry: ManifestEntry, state: WorkingCopyState): SyncAct
   // An unpinned entry is fetched but NEVER checked out. Without this, an
   // unpinned manifest could move a working copy — and "unpinned" means nobody
   // has decided where it should be, so moving it would be a guess.
+  //
+  // ONCE, though. `fetchedThisRun` is what makes "fetch it" a step rather than
+  // a standing condition; without it this branch answers `Fetch` to a state it
+  // has already fetched, and the caller's convergence loop obliges.
   if (!isPinned(entry.ref)) {
-    return { _tag: 'Fetch', name: entry.name, reason: 'unpinned' }
+    return state.fetchedThisRun
+      ? { _tag: 'UpToDate', name: entry.name }
+      : { _tag: 'Fetch', name: entry.name, reason: 'unpinned' }
   }
 
   if (state.head === entry.ref) {
@@ -106,9 +138,19 @@ export const planAll = (
   observe: (entry: ManifestEntry) => WorkingCopyState,
 ): ReadonlyArray<SyncAction> => entries.map((entry) => planSync(entry, observe(entry)))
 
-/** True when the action changes nothing on disk. */
+/** True when the action changes nothing on disk and runs no command. */
 export const isNoOp = (action: SyncAction): boolean =>
-  action._tag === 'AlreadyAtRef' || action._tag === 'SkipDirty'
+  action._tag === 'AlreadyAtRef' || action._tag === 'UpToDate' || action._tag === 'SkipDirty'
+
+/**
+ * True when the action contacts the remote, making its objects local.
+ *
+ * The caller uses this to set `fetchedThisRun` on the state it observes after
+ * the action. It is here, next to `applyAction`, so the script and the model
+ * cannot disagree about which actions count as "we have talked to the remote".
+ */
+export const fetchesFromRemote = (action: SyncAction): boolean =>
+  action._tag === 'Clone' || action._tag === 'Fetch'
 
 /**
  * A model of what each action does to a working copy.
@@ -138,15 +180,22 @@ export const applyAction = (
         head: isPinned(entry.ref) ? entry.ref : 'default-branch-head',
         dirty: false,
         hasPinnedRef: true,
+        // A clone IS a fetch. An unpinned repository that was just cloned has
+        // no reason to be fetched again in the same run, and saying otherwise
+        // here would cost one wasted round-trip per absent repository.
+        fetchedThisRun: true,
       }
 
     case 'Fetch':
-      return state._tag === 'Present' ? { ...state, hasPinnedRef: true } : state
+      return state._tag === 'Present'
+        ? { ...state, hasPinnedRef: true, fetchedThisRun: true }
+        : state
 
     case 'Checkout':
       return state._tag === 'Present' ? { ...state, head: action.ref } : state
 
     case 'AlreadyAtRef':
+    case 'UpToDate':
     case 'SkipDirty':
       return state
   }
@@ -155,10 +204,17 @@ export const applyAction = (
 /**
  * Plan, apply, and re-plan until nothing changes — or give up.
  *
- * A single repository needs at most two rounds (fetch, then checkout), so
- * `maxRounds` defaults to 3 and exceeding it means the model has a loop, which
- * is a bug rather than a condition to handle. Returns the actions taken in
- * order plus the settled state.
+ * A single repository needs at most two rounds of WORK — fetch, then checkout —
+ * plus the round that observes there is nothing left to do, so `maxRounds`
+ * defaults to 3. Exceeding it means the model has a loop, which is a bug rather
+ * than a condition to handle. Returns the actions taken in order plus the
+ * settled state.
+ *
+ * Every entry reaches a no-op, unpinned ones included: an unpinned entry
+ * settles as `Fetch` then `UpToDate`, and `test/sync-plan.test.ts` asserts that
+ * over every entry x every state. The round limit is a guard against a bug, not
+ * the thing that stops the loop — if it is ever what stops the loop, something
+ * here is wrong.
  */
 export const settle = (
   entry: ManifestEntry,
@@ -192,7 +248,9 @@ export const summarise = (actions: ReadonlyArray<SyncAction>): SyncSummary => ({
   cloned: actions.filter((action) => action._tag === 'Clone').map((action) => action.name),
   fetched: actions.filter((action) => action._tag === 'Fetch').map((action) => action.name),
   checkedOut: actions.filter((action) => action._tag === 'Checkout').map((action) => action.name),
-  unchanged: actions.filter((action) => action._tag === 'AlreadyAtRef').map((action) => action.name),
+  unchanged: actions
+    .filter((action) => action._tag === 'AlreadyAtRef' || action._tag === 'UpToDate')
+    .map((action) => action.name),
   skippedDirty: actions.filter((action) => action._tag === 'SkipDirty').map((action) => action.name),
 })
 
@@ -263,6 +321,7 @@ export const gitCommandsFor = (
       return [['-C', directory, 'checkout', '--detach', action.ref]]
 
     case 'AlreadyAtRef':
+    case 'UpToDate':
     case 'SkipDirty':
       return []
   }
@@ -280,6 +339,8 @@ export const describeAction = (action: SyncAction): string => {
       return `checkout ${action.name} @ ${action.ref}`
     case 'AlreadyAtRef':
       return `ok      ${action.name} (already at ${action.ref})`
+    case 'UpToDate':
+      return `ok      ${action.name} (unpinned in repos.json — fetched, HEAD left where it was)`
     case 'SkipDirty':
       return `SKIP    ${action.name} — uncommitted changes. Nothing was touched. Commit or stash, then re-run.`
   }

@@ -85,18 +85,26 @@ const describeManifestError: (error) => string
 ```typescript
 type WorkingCopyState =
   | { _tag: 'Absent' }
-  | { _tag: 'Present'; head: string; dirty: boolean; hasPinnedRef: boolean }
+  | {
+      _tag: 'Present'
+      head: string
+      dirty: boolean
+      hasPinnedRef: boolean
+      fetchedThisRun: boolean   // ディスクからは読めない。呼び出し側が run 内で持ち回る
+    }
 
 type SyncAction =
   | { _tag: 'Clone';        name; url; ref }
   | { _tag: 'Fetch';        name; reason: 'ref-not-local' | 'unpinned' }
   | { _tag: 'Checkout';     name; ref }
   | { _tag: 'AlreadyAtRef'; name; ref }
+  | { _tag: 'UpToDate';     name }   // unpinned で fetch 済み。AlreadyAtRef の unpinned 版
   | { _tag: 'SkipDirty';    name }
 
 const planSync: (entry: ManifestEntry, state: WorkingCopyState) => SyncAction
 const planAll:  (entries, observe) => ReadonlyArray<SyncAction>
 const isNoOp:   (action) => boolean
+const fetchesFromRemote: (action) => boolean   // Clone | Fetch。`fetchedThisRun` の決め方
 
 const applyAction: (entry, state, action) => WorkingCopyState   // スクリプトの動作モデル
 const settle:      (entry, from, maxRounds?) => { actions, state }
@@ -115,7 +123,8 @@ const describeAction: (action) => string
 | --- | --- |
 | `Absent` | `Clone` |
 | `Present` かつ **dirty** | **`SkipDirty`**(他のどの条件よりも先に判定) |
-| `Present` / clean / ref が `unpinned` | `Fetch(unpinned)` — **HEAD は動かさない** |
+| `Present` / clean / ref が `unpinned` / まだ fetch していない | `Fetch(unpinned)` — **HEAD は動かさない** |
+| `Present` / clean / ref が `unpinned` / この run で fetch 済み | `UpToDate` |
 | `Present` / clean / `head === ref` | `AlreadyAtRef` |
 | `Present` / clean / ref がローカルに無い | `Fetch(ref-not-local)` → 再判定 |
 | `Present` / clean / ref がローカルにある | `Checkout` |
@@ -137,7 +146,14 @@ const describeAction: (action) => string
 | `Clone`(unpinned) | `clone <url> <dir>` |
 | `Fetch` | `-C <dir> fetch --prune --tags origin` |
 | `Checkout` | `-C <dir> checkout --detach <ref>` |
-| `AlreadyAtRef` / `SkipDirty` | (なし) |
+| `AlreadyAtRef` / `UpToDate` / `SkipDirty` | (なし) |
+
+`unpinned` のエントリが `Fetch` ではなく `UpToDate` に落ち着けるのは
+`fetchedThisRun` があるからである。これが無かった頃は、同じ状態に対して `Fetch` を返し続け、
+収束ループが上限まで fetch を繰り返していた(1 リポジトリあたり 3 往復)。
+`fetchedThisRun` はディスクから観測できる情報ではない —
+作業コピーは「11 秒前に誰かが fetch した」を記録していない —
+ので、`scripts/sync-repos.ts` が `fetchesFromRemote` を使って run 内で持ち回る。
 
 ### `applyAction` は契約である
 

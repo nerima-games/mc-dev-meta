@@ -174,7 +174,14 @@ export const REPOSITORIES: ReadonlyArray<RepositoryEntry> = [
   {
     name: 'mc-compose',
     tier: 'composition',
-    dependsOn: ['mx-gameplay', 'mx-redstone', 'mx-ui', 'mx-multiplayer'],
+    // mc-render is here because compose registers the frame's input,
+    // camera-mirror, chunk-sync, draw and post-fx stages. plan.md §2.1 gave
+    // mc-render no runtime dependant at all — its only edge came from
+    // mc-playground-kit, which is devDependency-only — so nothing could reach
+    // the renderer, and the shipped build had no input stage. Registering
+    // another module's stages is wiring, not a rule, so it does not breach
+    // compose's prime directive.
+    dependsOn: ['mc-render', 'mx-gameplay', 'mx-redstone', 'mx-ui', 'mx-multiplayer'],
     devDependsOn: [],
     responsibility: 'Layer マージ + stage 順序表(唯一の全順序)+ セッション + QA API + Modding 入口 + E2E',
   },
