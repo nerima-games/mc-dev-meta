@@ -2,6 +2,14 @@
 
 `@nerima-games/mc-dev-meta` の実装情報はここに集約する。
 
+## 表記
+
+| 表記 | 意味 |
+| --- | --- |
+| `<reference-impl>` | **参照実装のチェックアウトのルート**。凍結された `takeokunn/ts-minecraft` の作業コピーを指す。本ドキュメント群では `<reference-impl>/packages/…` の形か、単に `packages/…`（同じくルート相対）で引用する。手元のどこに clone してあっても読み替えられるようにするためのプレースホルダである |
+| plan.md | リポジトリ構成仕様書（16 リポジトリ、確定済み）。**非公開**であり、公開読者は開けない。だから本ドキュメント群は「plan.md を読まなくても追える」ことを要件にしている —— plan.md の主張を引くときは必ず原文を引用し、参照実装での裏づけを file:line で添える |
+| `nerima-games/<repo>` | 同 org の兄弟リポジトリ。リンクは GitHub の URL で張る |
+
 ## 0. 一行で
 
 **15 リポジトリを `repos/` に clone し、1 つの pnpm workspace として束ねる。
@@ -13,6 +21,7 @@
 | --- | --- | --- |
 | [workflow.md](./workflow.md) | **開発ワークフロー。** セットアップ、日々の流れ、`workspace:*` から公開バージョンへの移行 | **全員。最初に読む** |
 | [manifest.md](./manifest.md) | **なぜ `repos.json` が存在するのか。** `pnpm sync` が壊さないもの | 全員。**必読** |
+| [step2-status.md](./step2-status.md) | **横断の現況。** plan.md §6 Step 2 の完了条件「内蔵プレビューが操作可能」を満たすリポジトリは **0 / 15**。その単一のボトルネック | 全員。進捗を語る前に |
 | [architecture.md](./architecture.md) | 4 階層アーキテクチャ、16 リポジトリ依存グラフ、本リポジトリの位置(グラフ外)、名詞/動詞ルール、mc-playground-kit の devDependency 専用ルール | 全員 |
 | [responsibility.md](./responsibility.md) | 持つもの / 持たないもの。**手元の作業を壊さない**という絶対規則 | 実装者・レビュアー |
 | [public-api.md](./public-api.md) | 純粋層の API と契約 | 実装者 |
@@ -73,3 +82,7 @@
 - **changesets 運用は未決。** [versioning.md](./versioning.md) §6
 - **ロスターの publish は未実装。** 現在は 16 リポジトリが手作業でミラーしている
   ([architecture.md](./architecture.md) §3.1)
+- **plan.md §6 Step 2 の完了条件「内蔵プレビューが操作可能」を満たすリポジトリは 0 / 15。**
+  `apps/` ディレクトリがどのリポジトリにも無く、`mc-playground-kit` を依存に持つリポジトリも 0 件である。
+  0 が 15 個並んでいるのではなく、publish 未着手という**1 本の連鎖**の帰結である
+  ([step2-status.md](./step2-status.md))

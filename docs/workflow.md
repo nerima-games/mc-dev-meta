@@ -44,7 +44,7 @@ $ find . -path ./node_modules -prune -o -name '*.ts' -not -name '*.test.ts' -pri
 ```console
 $ git clone https://github.com/nerima-games/mc-dev-meta.git
 $ cd mc-dev-meta
-$ direnv allow          # devenv 経由で nodejs_22 + pnpm が入る
+$ direnv allow          # flake.nix の devShell で nodejs_22 + corepack が入る
 $ pnpm install          # このリポジトリ自身の devDependencies
 $ pnpm sync             # 15 リポジトリを repos/ へ clone
 $ pnpm install          # ここで repos/* が workspace として解決される
