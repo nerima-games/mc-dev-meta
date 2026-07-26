@@ -71,7 +71,9 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 | `pnpm test` | vitest(**プレーン vitest**。`@effect/vitest` は使わない — 依存ゼロのため) |
 | `pnpm test:coverage` | カバレッジ計測(閾値は未設定) |
 | `pnpm check:deps` | 依存ホワイトリスト + 循環検査 + `Date.now()` 禁止の検査 |
-| `pnpm verify` | `typecheck && lint && check:deps && test`。CI と同じ内容 |
+| `pnpm api:check` | `api-lock.md` が実際の公開 API と食い違えば非ゼロ終了（[`docs/public-api.md`](./docs/public-api.md) §5） |
+| `pnpm api:update` | `api-lock.md` を書き直す。公開面を変える PR は結果を同じ PR に含める |
+| `pnpm verify` | `typecheck && lint && check:deps && api:check && test`。CI と同じ内容 |
 
 **`pnpm verify` は `repos/` が空でも通る。** これは配慮ではなく責務である
 — 15 リポジトリを取ってくるツールが、最後に信用できるようになるものであってはならない。

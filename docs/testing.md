@@ -146,7 +146,7 @@ if (!status.ok || !head.ok) {
 CI は `repos/` が空の状態で回る。そこで:
 
 ```console
-$ pnpm verify          # typecheck && lint && check:deps && test
+$ pnpm verify          # typecheck && lint && check:deps && api:check && test
 $ pnpm check:workspace # exit 0、「空です」と言う
 ```
 
