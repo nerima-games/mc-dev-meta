@@ -74,10 +74,49 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 | `pnpm check:deps` | 依存ホワイトリスト + 循環検査 + `Date.now()` 禁止の検査 |
 | `pnpm api:check` | `api-lock.md` が実際の公開 API と食い違えば非ゼロ終了（[`docs/public-api.md`](./docs/public-api.md) §5） |
 | `pnpm api:update` | `api-lock.md` を書き直す。公開面を変える PR は結果を同じ PR に含める |
-| `pnpm verify` | `typecheck && lint && check:deps && api:check && test`。CI と同じ内容 |
+| `pnpm check:mirrors` | 手書きミラー(`domain/kernel-vocabulary.ts` など)を**ミラー元リポジトリと突き合わせる**。下記 |
+| `pnpm verify` | `typecheck && lint && check:deps && api:check && check:mirrors && test`。CI と同じ内容 |
 
 **`pnpm verify` は `repos/` が空でも通る。** これは配慮ではなく責務である
 — 15 リポジトリを取ってくるツールが、最後に信用できるようになるものであってはならない。
+
+## `pnpm check:mirrors` — このリポジトリにしか置けない検査
+
+まだ何も publish されていないため、いくつかのリポジトリは将来 import する宣言を
+**手書きでミラーしている**:
+
+| ミラー | 置き場所 | ミラー元 |
+| --- | --- | --- |
+| `domain/kernel-vocabulary.ts` | mc-sim / mc-render / mc-playground-kit / mc-compose / mc-worldgen | mc-kernel |
+| `domain/frame-contract.ts` | mx-gameplay / mx-redstone / mx-ui | mc-kernel |
+| `domain/chunk-store-port.ts` | mx-gameplay | mc-worldgen(能力表は mc-kernel) |
+
+各リポジトリには `*-mirror.test.ts` があり、形と `Context.Tag` のキーを両方向に pin している。
+**それは「書き写した結果」を pin しているのであって、「書き写し元」ではない。**
+元は依存関係にない別リポジトリにあり、publish されるまで依存関係にできない。
+だからミラーと元は乖離でき、しかも 16 リポジトリすべてが green のままでいられる。
+
+**mc-dev-meta は、両方のパッケージが 1 つのビルドに同時に存在する組織内で唯一の場所である。**
+この検査がここにあり、他のどこにも置けない理由はそれに尽きる。
+
+比較は 3 系統に分かれる(`domain/mirror-contract.ts` に全論拠がある):
+
+1. **値** — 両方の実モジュールを import して実行する。定数は直接比較、`Brand.refined`
+   は固定サンプル列に対する accept / reject / throw のベクタで比較する
+   (`DeltaTimeSecs` が片方で `[0.001, 0.05]`、片方で `>= 0` だった過去の欠陥はこれで捕まる)。
+2. **タグキー** — 同じく import して `.key` を比較する。Effect はこの文字列で解決するので、
+   食い違った 2 つは実行時に別サービス・型検査は両方通る。
+3. **型の形** — 型は実行時に存在しないので、ミラー元の**コミット済み `api-lock.md`**
+   (tsc の declaration emit で生成され、`pnpm api:check` が鮮度を保証している)と
+   ミラーのソースを、同じパーサで読む。比較するのは**メンバ名・省略可否・union の arm** で、
+   **メンバの型は比較しない** — ミラーは意図的にそこで乖離しており
+   (`biomes: ReadonlyArray<string>`、unbranded な `BlockId`)、既知の差分で埋まった
+   レポートは誰も読まなくなるからである。
+
+`repos/` が空・部分的・未 install のときは **skip**(理由を毎回印字する)。
+別リポジトリにあって修正できない実在の欠陥は `KNOWN_FINDINGS` に指紋つきで記録し、
+毎回印字はするが run は落とさない。ただし**新しい差分**と、
+**直ったのに残っているエントリ**は落とす。
 
 ## なぜ `repos.json` をコミットするのか
 

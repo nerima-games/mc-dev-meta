@@ -33,6 +33,7 @@
     "update:manifest:dry": "tsx scripts/update-manifest.ts --dry-run",
     "check:workspace": "tsx scripts/check-workspace.ts",
     "check:api-window": "tsx scripts/check-api-lock-window.ts",
+    "check:mirrors": "tsx scripts/check-mirrors.ts",
     "typecheck": "tsc -p tsconfig.build.json --pretty false && tsc -p tsconfig.test.json --pretty false",
     "lint": "oxlint --deny-warnings index.ts domain scripts test",
     "lint:fix": "oxlint --fix index.ts domain scripts test",
@@ -42,7 +43,7 @@
     "check:deps": "tsx scripts/check-dependency-whitelist.ts",
     "api:check": "tsx scripts/api-lock.ts",
     "api:update": "tsx scripts/api-lock.ts --write",
-    "verify": "pnpm typecheck && pnpm lint && pnpm check:deps && pnpm api:check && pnpm test"
+    "verify": "pnpm typecheck && pnpm lint && pnpm check:deps && pnpm api:check && pnpm check:mirrors && pnpm test"
   },
   "devDependencies": {
     "@types/node": "^22.19.11",
