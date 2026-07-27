@@ -461,69 +461,21 @@ export type KnownRepointFinding = {
  * which is the point of measuring it now.
  */
 export const KNOWN_REPOINT_FINDINGS: ReadonlyArray<KnownRepointFinding> = [
-  {
-    fingerprint:
-      "mx-gameplay/domain/frame-contract.ts|tsconfig.test.json|test/support/frame-runner.ts|TS2375|Type 'Effect<void, never, ClockPort>' is not assignable to type 'Effect<void, never, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.",
-    summary:
-      "mx-gameplay's test frame runner executes a StageRegistration without providing a ClockPort",
-    owner: 'mx-gameplay',
-    fix:
-      'test/support/frame-runner.ts must provide a ClockPort layer before running a stage, ' +
-      'once FrameServices widens from never to ClockPort. Shipped source is unaffected.',
-  },
-  {
-    fingerprint:
-      "mx-gameplay/domain/frame-contract.ts|tsconfig.test.json|test/stage-registration.test.ts|TS2375|Type 'Effect<void, never, ClockPort>' is not assignable to type 'Effect<void, never, TestServices>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.",
-    summary:
-      "mx-gameplay's stage-registration tests run stages against a TestServices context with no ClockPort",
-    owner: 'mx-gameplay',
-    fix: 'Same fix as the frame runner: the test context must carry a ClockPort.',
-  },
-  {
-    fingerprint:
-      "mx-gameplay/domain/frame-contract.ts|tsconfig.test.json|test/stage-registration.test.ts|TS2375|Type 'Effect<void, never, ClockPort>' is not assignable to type 'Effect<void, never, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.",
-    summary:
-      "mx-gameplay's stage-registration tests also run a stage at an empty context",
-    owner: 'mx-gameplay',
-    fix: 'Same fix as the frame runner: the test context must carry a ClockPort.',
-  },
-  {
-    fingerprint:
-      "mx-gameplay/domain/frame-contract.ts|tsconfig.test.json|test/mob-spawn-search.test.ts|TS2375|Type 'Effect<void, never, ClockPort>' is not assignable to type 'Effect<void, never, TestServices>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.",
-    summary: "mx-gameplay's mob-spawn-search tests run stages with no ClockPort in context",
-    owner: 'mx-gameplay',
-    fix: 'Same fix as the frame runner: the test context must carry a ClockPort.',
-  },
-  {
-    fingerprint:
-      "mx-gameplay/domain/frame-contract.ts|tsconfig.preview.json|apps/preview-mining-site/site.ts|TS2375|Type 'Effect<FrameRow, never, ClockPort>' is not assignable to type 'Effect<FrameRow, never, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.",
-    summary: "mx-gameplay's preview app drives frames without providing a ClockPort",
-    owner: 'mx-gameplay',
-    fix:
-      'apps/preview-mining-site must provide a ClockPort layer once FrameServices widens. ' +
-      'The preview already owns a deterministic clock; it is not currently wired to stages.',
-  },
-  {
-    fingerprint:
-      "mx-gameplay/domain/frame-contract.ts|tsconfig.preview.json|apps/preview-mining-site/stats.ts|TS2375|Type 'Effect<string[], never, ClockPort>' is not assignable to type 'Effect<readonly string[], never, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.",
-    summary: "mx-gameplay's preview stats collector drives frames without providing a ClockPort",
-    owner: 'mx-gameplay',
-    fix: 'Same fix as the preview site.',
-  },
-  {
-    fingerprint:
-      "mx-ui/domain/frame-contract.ts|tsconfig.test.json|test/stage-registration.test.ts|TS2375|Type 'Effect<void, never, ClockPort>' is not assignable to type 'Effect<void, never, TestServices>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.",
-    summary: "mx-ui's stage-registration tests run stages against a context with no ClockPort",
-    owner: 'mx-ui',
-    fix: 'The test context must carry a ClockPort once FrameServices widens. Shipped source is unaffected.',
-  },
-  {
-    fingerprint:
-      "mx-redstone/domain/frame-contract.ts|tsconfig.test.json|test/stage-registration.test.ts|TS2375|Type 'Effect<void, never, ClockPort>' is not assignable to type 'Effect<void, never, TestServices>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.",
-    summary: "mx-redstone's stage-registration tests run stages against a context with no ClockPort",
-    owner: 'mx-redstone',
-    fix: 'The test context must carry a ClockPort once FrameServices widens. Shipped source is unaffected.',
-  },
+  // EMPTY, and it was not empty for long.
+  //
+  // The first run of this gate recorded seventeen findings across mx-gameplay,
+  // mx-ui and mx-redstone, every one of them the same shape: a test context that
+  // ran a frame stage without providing a `ClockPort`, against kernel's real
+  // `FrameServices = ClockPort`. They were listed here rather than failing the
+  // run, because none of them could be fixed from this repository -- each file
+  // belongs to another repository with its own pull request.
+  //
+  // All seventeen are now fixed at the source, and this array is the record of
+  // that rather than a backlog. Note what the gate does when an entry here stops
+  // reproducing: it SAYS SO, by name, instead of quietly passing. A known-defect
+  // list that is allowed to stay more pessimistic than reality is how a project
+  // ends up carrying warnings nobody believes -- so the list is checked in both
+  // directions and going green is an event that has to be written down.
 ]
 
 // ---------------------------------------------------------------------------

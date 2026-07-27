@@ -4,7 +4,7 @@
     {
       "name": "mc-kernel",
       "url": "https://github.com/nerima-games/mc-kernel.git",
-      "ref": "a0662ff27bee7bcbcab62cb22f9e711b6195bb85"
+      "ref": "e0331695326addb8f447c952f01569b476f997ef"
     },
     {
       "name": "mc-noise",
@@ -54,17 +54,17 @@
     {
       "name": "mx-gameplay",
       "url": "https://github.com/nerima-games/mx-gameplay.git",
-      "ref": "bde80301d318be4c5afc84860a4625d609ab7bc0"
+      "ref": "5a72a553417e02d4e5ac54e5293726c6c79b3a3f"
     },
     {
       "name": "mx-redstone",
       "url": "https://github.com/nerima-games/mx-redstone.git",
-      "ref": "e3866b19299357a98022857d0ef8573a33d7cc7f"
+      "ref": "73f3c2e4f628150369852023b64002d8238c276a"
     },
     {
       "name": "mx-ui",
       "url": "https://github.com/nerima-games/mx-ui.git",
-      "ref": "52b9787b323240ca6dfd76a80fa815d2398352ab"
+      "ref": "87eacaff9defac041f633ba5f926d961767193ac"
     },
     {
       "name": "mx-multiplayer",
@@ -74,7 +74,7 @@
     {
       "name": "mc-compose",
       "url": "https://github.com/nerima-games/mc-compose.git",
-      "ref": "65758b3d1f7677a28bbe1ef4b60347c9b54f3c94"
+      "ref": "ff9737c3b7ec8f64a82ec157697fad2dca54a44f"
     }
   ]
 }
