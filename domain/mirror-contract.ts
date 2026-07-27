@@ -15,6 +15,7 @@
  *   domain/kernel-vocabulary.ts   mc-sim, mc-render, mc-playground-kit,
  *                                 mc-compose, mc-worldgen   <- mc-kernel
  *   domain/frame-contract.ts      mx-gameplay, mx-redstone, mx-ui  <- mc-kernel
+ *   domain/block-vocabulary.ts    mx-gameplay               <- mc-kernel
  *   domain/chunk-store-port.ts    mx-gameplay               <- mc-worldgen
  *
  * Each mirroring repository has a `*-mirror.test.ts` that pins its mirror's
@@ -110,9 +111,9 @@ import type { TypeShape, TypeVariant } from './type-shape'
 /**
  * A capability lookup that a mirror restates as its own predicate.
  *
- * `mx-gameplay/domain/chunk-store-port.ts` hand-transcribes the block ids that
+ * `mx-gameplay/domain/block-vocabulary.ts` hand-transcribes the block ids that
  * fall when unsupported and the ids that are replaceable, straight out of
- * mc-kernel's `BLOCK_REGISTRY`, as two local `Set`s. Nothing in mx-gameplay can
+ * mc-kernel's `BLOCK_REGISTRY`, as local `Set`s. Nothing in mx-gameplay can
  * check them: mc-kernel is not a dependency, and its own mirror test asserts
  * the sets it was written with. A wrong id there means gameplay asks the right
  * question of the wrong byte, and every test in the organisation agrees with
@@ -121,6 +122,12 @@ import type { TypeShape, TypeVariant } from './type-shape'
  * The probe names the mirror's exported predicate and the flag in the owning
  * repository's table. `scripts/check-mirrors.ts` evaluates both over every
  * representable block id and compares the accepted sets.
+ *
+ * A ROW IS ALSO AN OWNERSHIP CLAIM, and it exempts the named symbol from the
+ * "is it on the source's barrel?" comparison. Read the note under
+ * `MIRROR_SPECS` before adding one: `owner` may differ from the spec's `source`,
+ * and when it does, the spec had better be pointed at the mirror whose barrel
+ * really does replace that symbol.
  */
 export type CapabilityProbe = {
   /** The predicate the mirror exports, e.g. `isReplaceable`. */
@@ -177,42 +184,76 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     // mx-gameplay has its own notion of a chunk-shaped thing and did not want
     // to shadow it. A rename is not drift; an unrecorded rename would be.
     renamedTypes: [{ mirror: 'WorldgenChunk', source: 'Chunk' }],
-    // The capability half of this file mirrors mc-kernel, not mc-worldgen —
-    // two hops, one shape. This is the highest-risk transcription in the
-    // workspace and the reason the probe mechanism exists.
+    // EMPTY, AND THAT IS THE FIX. This file used to carry three capability
+    // probes and its repository used to export four capability predicates —
+    // mc-KERNEL's flags, in a mirror of MC-WORLDGEN. See the note below
+    // `MIRROR_SPECS` on what that combination hid. The predicates are in
+    // `domain/block-vocabulary.ts` now and so are their probes.
+    capabilities: [],
+  },
+  {
+    repository: 'mx-gameplay',
+    file: 'domain/block-vocabulary.ts',
+    source: 'mc-kernel',
+    renamedTypes: [],
     capabilities: [
       { mirrorExport: 'fallsWhenUnsupported', owner: 'mc-kernel', capability: 'fallsWhenUnsupported' },
       { mirrorExport: 'isReplaceable', owner: 'mc-kernel', capability: 'replaceable' },
-      // Added after a drift this list could not see. The mirror restates THREE
-      // of kernel's capabilities and only two were probed, so
-      // `NON_SPAWN_SURFACE_IDS` was free to disagree with kernel — and did, on
-      // `oak_log`, in both repositories at once.
+      // Added after a drift the list could not see. The mirror restates kernel's
+      // capabilities and only two were probed, so `NON_SPAWN_SURFACE_IDS` was
+      // free to disagree with kernel — and did, on `oak_log`, in both
+      // repositories at once.
       //
       // The lesson is about the shape of this array rather than about one id: a
       // probe list shorter than the set of capabilities a mirror restates
-      // reports success it has not checked, which is the failure mode
-      // `domain/mirror-contract.ts`'s own header calls "worse than no checker".
-      // A mirror that restates a fourth capability must gain a fourth row here.
+      // reports success it has not checked, which is the failure mode this
+      // file's own header calls "worse than no checker".
       //
       // Note this one is a NEGATIVE set on both sides (kernel defaults it to
       // `true`); the probe compares the accepted sets over every representable
       // id, so the polarity is handled by evaluation rather than by convention.
-      //
-      // SEQUENCING — this row cannot land before `repos.json` is bumped.
-      // `mx-gameplay` only began exporting `validSpawnSurface` after the
-      // revision currently pinned, so against today's manifest this probe hits
-      // the "declares a probe the mirror does not export" failure rather than
-      // comparing anything. That failure is the checker behaving correctly (a
-      // stale spec must not silently no-op), but it means the order is:
-      // `pnpm update:manifest` && `pnpm sync` first, this row second.
-      //
-      // Verified against the un-pinned working trees, both ways: it reports
-      // agreement when kernel's registry and the mirror match, and it goes red
-      // when kernel's roster is rolled back underneath the mirror.
       { mirrorExport: 'validSpawnSurface', owner: 'mc-kernel', capability: 'validSpawnSurface' },
+      // The fourth, and the one whose ABSENCE from this array is what exposed
+      // the structural defect. See the note below.
+      { mirrorExport: 'canSupportAttachments', owner: 'mc-kernel', capability: 'canSupportAttachments' },
     ],
   },
 ]
+
+/**
+ * WHY A PROBE ROW IS ALSO AN OWNERSHIP CLAIM, AND WHAT THAT ONCE HID
+ * ---------------------------------------------------------------------------
+ *
+ * `compareValues` skips every name in a spec's `capabilities` before it can ask
+ * `SymbolNotPublished`. It has to: a probed predicate is deliberately NOT on the
+ * source's barrel — it belongs to a third repository — so the barrel check would
+ * report a finding on every probe row. The skip is correct in isolation.
+ *
+ * Combined with a spec pointed at the wrong source it is a blindfold. Four
+ * capability predicates lived in `mx-gameplay/domain/chunk-store-port.ts`, whose
+ * source is mc-worldgen and whose header promises that deleting it and
+ * repointing every import at `@nerima-games/mc-worldgen` will typecheck.
+ * mc-worldgen exports none of the four. Three had probe rows here and were
+ * therefore exempt from the check that would have said so; they reported
+ * agreement for as long as they existed. The fourth, `canSupportAttachments`,
+ * had no row, fell through to the plain comparison, and failed with exactly the
+ * right message — and only once `repos.json` advanced far enough for this gate
+ * to be reading current code at all.
+ *
+ * So the two rules that follow from it, both applied above:
+ *
+ *   - A probe row is a claim that the predicate is a THIRD repository's. If the
+ *     mirror it sits in is not the mirror that repository's barrel replaces, the
+ *     row is hiding a broken repoint promise rather than checking a set.
+ *   - A mirror that restates a capability must carry a row for EVERY capability
+ *     it restates, in the spec for the file that actually holds them. A short
+ *     list reports success it has not checked; a misplaced list reports success
+ *     about the wrong package.
+ *
+ * This is NOT `DECLARED_DIVERGENCES` material and was considered for it. A
+ * divergence is intended and permanent. A mirror of mc-worldgen that mc-worldgen
+ * cannot replace is neither — it is a defect with a fix, and the fix landed.
+ */
 
 /** Where in the workspace a mirror lives, for messages. */
 export const mirrorPath = (spec: MirrorSpec): string => `${spec.repository}/${spec.file}`
@@ -239,7 +280,37 @@ export type DeclaredDivergence = {
   readonly reason: string
 }
 
-export const DECLARED_DIVERGENCES: ReadonlyArray<DeclaredDivergence> = []
+export const DECLARED_DIVERGENCES: ReadonlyArray<DeclaredDivergence> = [
+  // Both rows arrived with `mx-gameplay/domain/block-vocabulary.ts`, which
+  // became a spec above when the capability probes moved to it. Neither is new
+  // drift — the file has looked like this all along; it had simply never been
+  // compared against anything, which is the more interesting half of the story.
+  {
+    repository: 'mx-gameplay',
+    file: 'domain/block-vocabulary.ts',
+    subject: 'BLOCK_DROP_REGISTRY',
+    reason:
+      'A PROJECTION of kernel\'s BLOCK_REGISTRY, not a mirror of it, and the different name ' +
+      'is load-bearing. Kernel\'s rows are { id, definition: BlockDefinition } — the whole block. ' +
+      'This table is { id, type, harvestTool, drops }: the two struct-valued DROP columns and ' +
+      'nothing else, which is the subset the mirror\'s header says it transcribes. Naming it ' +
+      'BLOCK_REGISTRY would claim a mirror of a shape it does not have and trade this row for ' +
+      'member-level findings that mean less. It is also never imported: it exists to build the ' +
+      'two lookup maps behind dropOfBlockId, and dropOfBlockId, blockTypeOfId, blockIdOf, ' +
+      'resolveDrop and resolveDropItem ARE all on kernel\'s barrel. On the day mc-kernel is ' +
+      'published this table is deleted with its file and no call site follows it.',
+  },
+  {
+    repository: 'mx-gameplay',
+    file: 'domain/block-vocabulary.ts',
+    subject: 'BlockDropRegistryEntry',
+    reason:
+      'The row type of BLOCK_DROP_REGISTRY above, and it diverges for the same reason and to ' +
+      'the same extent. Kernel\'s BlockRegistryEntry nests a BlockDefinition; this one flattens ' +
+      'the two drop columns beside the id and the type name. Recorded separately because a ' +
+      'divergence covering a value must not silently cover a type as well.',
+  },
+]
 
 // ---------------------------------------------------------------------------
 // Known outstanding findings
