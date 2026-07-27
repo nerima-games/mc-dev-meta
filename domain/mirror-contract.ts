@@ -322,38 +322,6 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     properties: [],
   },
   {
-    // The FIRST mc-sim mirror this list has ever carried, and the reason it is
-    // worth saying so: `mx-gameplay/domain/entity-manager-port.ts` has mirrored
-    // mc-sim since the mob wiring landed and is not in this list, so until now
-    // every spec here pointed at mc-kernel or mc-worldgen. A mirror outside
-    // this list is a mirror nobody compares — which is exactly the state the
-    // `ChunkStore` capability predicates were in for as long as they existed.
-    //
-    // This one carries the whole of `InventoryServiceApi` plus the crafting
-    // vocabulary the api names (`Inventory`, `RecipeTable`, `CraftGrid`,
-    // `RecipeMatch`, `CraftResult` and everything under them), so it is the
-    // widest single mirror in the workspace and the one with the most surface
-    // to drift. It is also the one whose drift is quietest: nothing in
-    // mx-gameplay READS a recipe, so a member that fell out of `ShapedRecipe`
-    // would break no test in either repository.
-    repository: 'mx-gameplay',
-    file: 'domain/inventory-port.ts',
-    source: 'mc-sim',
-    // NOTHING is renamed, deliberately, and that is a claim this gate checks
-    // rather than a note. `mx-gameplay/domain/inventory-port.ts`'s header
-    // records the rule it is following: a mirror that renames a symbol
-    // typechecks, passes every local test, and yields a name that does not
-    // exist on repoint day.
-    renamedTypes: [],
-    // EMPTY, AND IT MUST STAY EMPTY. A probe row exempts its symbol from the
-    // "is it on the source's barrel?" check, and the two symbols this mirror
-    // is most likely to grow — `ItemType` and `StackCount` — are precisely the
-    // two that mc-sim's barrel does NOT hand back, because mc-sim deliberately
-    // does not re-export its own kernel mirror. They live in mx-gameplay's
-    // kernel mirrors instead. A probe row here would hide that.
-    capabilities: [],
-  },
-  {
     repository: 'mx-gameplay',
     file: 'domain/block-vocabulary.ts',
     source: 'mc-kernel',
