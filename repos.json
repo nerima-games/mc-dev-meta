@@ -4,7 +4,7 @@
     {
       "name": "mc-kernel",
       "url": "https://github.com/nerima-games/mc-kernel.git",
-      "ref": "e0331695326addb8f447c952f01569b476f997ef"
+      "ref": "8c7aace13b7f3f73f87495ae3d58a949be56979d"
     },
     {
       "name": "mc-noise",
@@ -54,7 +54,7 @@
     {
       "name": "mx-gameplay",
       "url": "https://github.com/nerima-games/mx-gameplay.git",
-      "ref": "5a72a553417e02d4e5ac54e5293726c6c79b3a3f"
+      "ref": "2717d11dddd39aa22abbdba0f014270e16a357d6"
     },
     {
       "name": "mx-redstone",
