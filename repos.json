@@ -39,7 +39,7 @@
     {
       "name": "mc-sim",
       "url": "https://github.com/nerima-games/mc-sim.git",
-      "ref": "fa4dbcf2af9b98f9c52851866c2be10cbc8805c1"
+      "ref": "c8e8dfac8935679f989cbb16353e3f4ed9b80035"
     },
     {
       "name": "mc-render",

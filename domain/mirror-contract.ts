@@ -224,7 +224,52 @@ export type MirrorSpec = {
  * looks like, and is the signal to delete its row here too).
  */
 export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
-  { repository: 'mc-sim', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
+  {
+    repository: 'mc-sim',
+    file: 'domain/kernel-vocabulary.ts',
+    source: 'mc-kernel',
+    renamedTypes: [],
+    // EMPTY AND CORRECT, for the reason mc-worldgen's row is not: this mirror
+    // transcribes no capability FLAG and no property COLUMN. Its header states
+    // the boundary — `block-item.ts` and `block-registry.ts`'s drop resolution
+    // are deliberately not mirrored, because "what does breaking this block give
+    // you" is mx-gameplay's verb. There is no block table here to probe, so a
+    // probe row would be inventing data the file does not carry.
+    capabilities: [],
+    properties: [],
+    // ---------------------------------------------------------------------
+    // BUT THIS ROW HAS A BLIND SPOT OF THE SAME SHAPE, AND IT HAS ALREADY COST
+    // SOMETHING. It is recorded here because the row above looks complete.
+    // ---------------------------------------------------------------------
+    //
+    // What this mirror carries that neither probe kind covers is a ROSTER:
+    // `ITEM_TYPES`, a closed literal union whose MEMBERSHIP IS THE TYPE.
+    // `observeValue` in `scripts/check-mirrors.ts` reduces an array to
+    // `Opaque{kind:'object'}`, so this gate compares "both sides export an
+    // object called ITEM_TYPES" and nothing whatever about what is in it.
+    //
+    // That is not a hypothesis. This mirror sat at 23 literals while kernel's
+    // roster was 97 — seventy-four missing — and `check:mirrors` reported
+    //
+    //   ok    mc-sim/domain/kernel-vocabulary.ts vs mc-kernel — 14 value(s) ...
+    //
+    // on every run of that period. It was `pnpm check:repoint` that found it, by
+    // deleting a mirror and typechecking against the real module, and it showed
+    // up as a TS2345 at the mx-gameplay seam rather than as anything mc-sim or
+    // this gate could see.
+    //
+    // kernel's audit §4.9.1(d) is the rule already on the books —
+    // 「ミラーが転記している能力の数より probe が少なければ、そのチェックは検査
+    // していない成功を報告する」 — and a roster compared as `typeof === 'object'`
+    // is that sentence with `capability` replaced by `member`. The fix is a third
+    // probe kind (a roster probe: read both arrays, compare element-wise and in
+    // order) and it is deliberately NOT attempted in the same change that fixed
+    // the roster itself, because it alters `MirrorSpec` for all eleven specs.
+    //
+    // Until it exists, `mc-sim/test/kernel-mirror.test.ts` pins the roster from
+    // inside mc-sim and `check:repoint` catches it from outside; neither is this
+    // gate, and this gate should not be read as covering it.
+  },
   { repository: 'mc-render', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
   { repository: 'mc-playground-kit', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
   { repository: 'mc-compose', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
