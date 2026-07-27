@@ -9,11 +9,11 @@
 | ロスター | 16 件・階層・グラフ・**ゲートのコピーとの一致** | `test/roster.test.ts`(17 tests) |
 | ワークスペース実行 | **空の repos/** ・部分・完全・未管理ディレクトリ | `test/workspace.test.ts`(20 tests) |
 | 依存境界 | ホワイトリスト・循環検査・`Date.now()` 禁止 | `test/check-dependency-whitelist.test.ts`(40 tests) |
-| **ミラー突合**(横断) | 一致・定数 drift・タグキー drift・brand の refinement drift・union の arm 欠落・未 clone の skip | `test/mirror-contract.test.ts`(39 tests) |
+| **ミラー突合**(横断) | 一致・定数 drift・タグキー drift・brand の refinement drift・union の arm 欠落・**能力フラグ drift・プロパティ列 drift**・未 clone の skip | `test/mirror-contract.test.ts`(64 tests) |
 | 型の形の読み取り | 手書き union と tsc の union の**両方の綴り**・コメント/文字列の除去・`api-lock.md` | `test/type-shape.test.ts`(22 tests) |
 | `scripts/` の I/O | **検証しない**(§4) | — |
 
-現在 **253 tests / 9 files**、`pnpm test` で 500ms 前後。
+現在 **362 tests / 11 files**、`pnpm test` で 500ms 前後。
 
 ## 2. プレーン vitest を使う
 
@@ -175,8 +175,60 @@ $ pnpm check:mirrors   # exit 0、「比較できたミラーは 0/9」と言う
 | clone 済みだが `pnpm install` されていない | skip(理由を印字) |
 | import はできたが値も型も 0 件だった | **落ちる**(比較対象ゼロは「一致」ではない) |
 | `MIRROR_SPECS` が実在しない export を probe している | **落ちる**(古い spec が黙って no-op になるのを防ぐ) |
+| プロパティ probe が id を 1 件も読まなかった | **落ちる**(0 件の比較は「一致」ではない) |
 | `KNOWN_FINDINGS` にある既知欠陥 | 落ちない。ただし毎回全文を印字する |
 | 新しい差分 / 既知欠陥が直ったのにエントリが残っている | **落ちる** |
+
+### 6.0.1 ブロックテーブルの突合 — 能力フラグとプロパティ列
+
+mc-kernel はブロックの振る舞いモデルを設計時点で**2 つに割っている**。
+
+| | 置き場所 | アクセサ | 値 |
+| --- | --- | --- | --- |
+| 能力(boolean) | `domain/block-capabilities.ts` | `capabilityOfBlockId(id, flag)` | `true` / `false` |
+| プロパティ(型付き) | `domain/block-properties.ts` | `propertyOfBlockId(id, name)` | `opacity` は 3 値 enum、`lightEmission` は 0..15、`supportRule` は構造体 |
+
+`MIRROR_SPECS` は長らく**前者しか probe していなかった**。
+後者を転記しているミラーは probe を 1 件も持たず、それでも `ok` と報告されていた。
+
+これは仮定の話ではない。`mc-worldgen/domain/kernel-vocabulary.ts` は
+kernel が 24 行持っている非不透明ブロックを **6 行**しか転記しておらず、
+ladder・cobweb・11 種の植物・rail・cactus・slab がすべて `'opaque'` の既定値に落ちていた。
+**転記漏れはエラーにならず、既定値として読まれる** — `opacity` の既定値は `'opaque'`、
+すなわち実際より**暗い**方向であり、mc-worldgen の DN-7 が
+「保守的でないほう」と名指している方向である。暗く読まれたセルは、
+`hostile-spawn.ts` が拒否したはずの湧きを通す。
+地形生成は id 0-10 しか書かないので、**設置されたブロック経由でしか到達せず**、
+どのゴールデンフィクスチャも動かなかった。
+
+kernel 自身の audit §4.9.1(d) がこの規則を既に書いている —
+「ミラーが転記している能力の数より probe が少なければ、そのチェックは検査していない成功を報告する」。
+**プロパティ probe が 0 件の配列は、その文の極限形である。**
+
+現在 probe されている列:
+
+| ミラー | export | 列 |
+| --- | --- | --- |
+| `mc-worldgen/domain/kernel-vocabulary.ts` | `opacityOfBlockId` | `opacity` |
+| `mc-worldgen/domain/kernel-vocabulary.ts` | `lightEmissionOfBlockId` | `lightEmission` |
+| `mx-gameplay/domain/block-vocabulary.ts` | `supportRuleOfBlockId` | `supportRule` |
+
+**probe は owner の id 全域を閉じて比較する**(現状 0..255)。
+ミラー側のテーブルが尽きたところで止めると、行が欠けたミラーと「一致」してしまう。
+6/24 の状態が 1 週間気付かれなかったのは、まさにその形の
+スポットチェックしか存在しなかったからである。報告行は読んだ id 数も印字する —
+「probe 1 件」と「1 件の id しか読まなかった probe 1 件」は数だけでは区別できない。
+
+構造体の列は **JSON に描画してから**比較する。`String({kind:'none'})` は
+どの規則でも `[object Object]` になり、全 id で規則を取り違えたミラーが
+全 id で一致と報告される。
+
+**能力 probe と違い、プロパティ probe は「元リポジトリの barrel に載っているか」の
+検査を免除しない。** 能力 probe はそれを免除する必要がある(probe 先の述語は
+第三のリポジトリのものだから)が、その免除こそが `chunk-store-port.ts` の
+壊れた張り替え約束を 4 件隠していたものである。
+kernel は `opacityOfBlockId` 等を自分の barrel に載せているので、
+プロパティ probe は免除を必要とせず、**免除しない**。
 
 ## 6.1 `pnpm check:repoint` — `verify` に**入れていない**ゲート
 

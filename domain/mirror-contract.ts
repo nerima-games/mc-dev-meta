@@ -138,6 +138,53 @@ export type CapabilityProbe = {
   readonly capability: string
 }
 
+/**
+ * A PROPERTY column that a mirror restates as its own total lookup.
+ *
+ * The sibling of `CapabilityProbe`, and it exists because mc-kernel splits its
+ * block model in two AT DESIGN TIME. `domain/block-capabilities.ts` holds the
+ * boolean half, read through `capabilityOfBlockId`;
+ * `domain/block-properties.ts` holds the typed half — `opacity` is a three-value
+ * enum, `lightEmission` is `0..15`, `supportRule` is a struct — read through
+ * `propertyOfBlockId`. A probe array with capability rows and no property rows
+ * therefore compares one half of kernel's block model and reports on both.
+ *
+ * THAT IS NOT A HYPOTHETICAL AND IT COST A REAL DEFECT. mc-worldgen's
+ * `domain/kernel-vocabulary.ts` transcribed SIX non-opaque rows while kernel's
+ * registry carried twenty-four; the missing eighteen — a ladder, a cobweb,
+ * eleven plants, two rails, a cactus, a pressure plate and a slab — all fell
+ * through to the `'opaque'` default. That is the DARK direction, which
+ * mc-worldgen's DN-7 names as the NON-conservative one: a cell read darker than
+ * it is lets a hostile mob spawn where `hostile-spawn.ts` would have refused.
+ * Nothing caught it, because generated terrain only ever writes ids 0-10 — the
+ * defect was reachable only through a PLACED block, so no golden fixture moved.
+ *
+ * kernel's audit §4.9.1(d) already states the rule this violated:
+ * 「ミラーが転記している能力の数より probe が少なければ、そのチェックは検査して
+ * いない成功を報告する」. A probe array with zero property entries is that
+ * sentence's limiting case.
+ *
+ * UNLIKE A CAPABILITY ROW, THIS IS NOT AN OWNERSHIP CLAIM AND DOES NOT EXEMPT
+ * ANYTHING. Read the note under `MIRROR_SPECS`: a capability row has to skip the
+ * "is it on the source's barrel?" comparison, because a probed predicate belongs
+ * to a third repository and would otherwise be reported on every run — and that
+ * skip is what hid four broken repoint promises for as long as they existed.
+ * The property probes have no such need. Kernel publishes `opacityOfBlockId`,
+ * `lightEmissionOfBlockId` and `supportRuleOfBlockId` on its own barrel
+ * precisely so that a mirror can restate them under kernel's names, so every
+ * probed symbol here also faces the plain comparison and must survive it. A
+ * probe that ALSO silenced the barrel check would be trading a stronger
+ * guarantee for a weaker one.
+ */
+export type PropertyProbe = {
+  /** The total lookup the mirror exports, e.g. `opacityOfBlockId`. */
+  readonly mirrorExport: string
+  /** The repository that owns the property table. */
+  readonly owner: string
+  /** The column name in that table, e.g. `opacity`. */
+  readonly property: string
+}
+
 export type MirrorSpec = {
   /** The repository holding the mirror. */
   readonly repository: string
@@ -156,6 +203,15 @@ export type MirrorSpec = {
   readonly renamedTypes: ReadonlyArray<{ readonly mirror: string; readonly source: string }>
   /** Predicates restated from a capability table, possibly in a third repository. */
   readonly capabilities: ReadonlyArray<CapabilityProbe>
+  /**
+   * Total lookups restated from a property table.
+   *
+   * Required rather than optional, and on every spec, for the same reason
+   * `MirrorObservation.properties` is: an absent array and an empty one read
+   * identically at the call site, so a spec that simply forgot the field would
+   * probe nothing and be reported as agreement.
+   */
+  readonly properties: ReadonlyArray<PropertyProbe>
 }
 
 /**
@@ -168,14 +224,47 @@ export type MirrorSpec = {
  * looks like, and is the signal to delete its row here too).
  */
 export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
-  { repository: 'mc-sim', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [] },
-  { repository: 'mc-render', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [] },
-  { repository: 'mc-playground-kit', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [] },
-  { repository: 'mc-compose', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [] },
-  { repository: 'mc-worldgen', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [] },
-  { repository: 'mx-gameplay', file: 'domain/frame-contract.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [] },
-  { repository: 'mx-redstone', file: 'domain/frame-contract.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [] },
-  { repository: 'mx-ui', file: 'domain/frame-contract.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [] },
+  { repository: 'mc-sim', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
+  { repository: 'mc-render', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
+  { repository: 'mc-playground-kit', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
+  { repository: 'mc-compose', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
+  {
+    repository: 'mc-worldgen',
+    file: 'domain/kernel-vocabulary.ts',
+    source: 'mc-kernel',
+    renamedTypes: [],
+    // EMPTY AND CORRECT. This mirror's own header states the boundary it keeps:
+    // it asks kernel the two questions a light grid requires and no others, so
+    // it deliberately does not restate a single capability FLAG. Deciding that a
+    // byte falls when unsupported is a rule, and rules are mx-gameplay's.
+    capabilities: [],
+    // THE FIRST PROPERTY PROBES IN THIS LIST, and this is the mirror that paid
+    // for them. Its header names the gap in the first person — 「`lightEmission`
+    // and `opacity` are PROPERTIES, and that probe has no property half」 — and
+    // then records what the gap cost: the opacity table below it kept six rows
+    // out of kernel's twenty-four for a full week, so `./light.ts` treated a
+    // ladder, a rail, a flower, a cactus and a slab as fully light-blocking.
+    //
+    // The mirror's answer at the time was to make its OWN test exhaustive over
+    // kernel's id range, and its header is honest about why that is not enough:
+    // 「this file's correctness is checked by a test that this repository could
+    // edit in the same commit that breaks it」. These two rows are the structural
+    // fix it asked for. They read kernel's table at runtime, in the one build
+    // where both packages exist, so no edit in mc-worldgen can make them agree.
+    properties: [
+      { mirrorExport: 'opacityOfBlockId', owner: 'mc-kernel', property: 'opacity' },
+      { mirrorExport: 'lightEmissionOfBlockId', owner: 'mc-kernel', property: 'lightEmission' },
+    ],
+    // `transmitsLight` is NOT probed and its absence is a decision rather than an
+    // oversight. Both sides define it as `opacityOfBlockId(id) !== 'opaque'`, so
+    // it is a projection of a column already compared here id for id: it cannot
+    // disagree unless `opacity` does, and if `opacity` does then this probe
+    // already names the id. A row for it would add a second failure line per
+    // defect and no reachable defect of its own.
+  },
+  { repository: 'mx-gameplay', file: 'domain/frame-contract.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
+  { repository: 'mx-redstone', file: 'domain/frame-contract.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
+  { repository: 'mx-ui', file: 'domain/frame-contract.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
   {
     repository: 'mx-gameplay',
     file: 'domain/chunk-store-port.ts',
@@ -190,6 +279,47 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     // `MIRROR_SPECS` on what that combination hid. The predicates are in
     // `domain/block-vocabulary.ts` now and so are their probes.
     capabilities: [],
+    // Empty for the same reason, and checked rather than assumed: this file
+    // mirrors mc-worldgen, and mc-worldgen owns no block table at all. A
+    // property row here would be the same misplacement the note below records.
+    properties: [],
+  },
+  {
+    // The FIRST mc-sim mirror this list has ever carried, and the reason it is
+    // worth saying so: `mx-gameplay/domain/entity-manager-port.ts` has mirrored
+    // mc-sim since the mob wiring landed and is not in this list, so until now
+    // every spec here pointed at mc-kernel or mc-worldgen. A mirror outside
+    // this list is a mirror nobody compares — which is exactly the state the
+    // `ChunkStore` capability predicates were in for as long as they existed.
+    //
+    // This one carries the whole of `InventoryServiceApi` plus the crafting
+    // vocabulary the api names (`Inventory`, `RecipeTable`, `CraftGrid`,
+    // `RecipeMatch`, `CraftResult` and everything under them), so it is the
+    // widest single mirror in the workspace and the one with the most surface
+    // to drift. It is also the one whose drift is quietest: nothing in
+    // mx-gameplay READS a recipe, so a member that fell out of `ShapedRecipe`
+    // would break no test in either repository.
+    repository: 'mx-gameplay',
+    file: 'domain/inventory-port.ts',
+    source: 'mc-sim',
+    // NOTHING is renamed, deliberately, and that is a claim this gate checks
+    // rather than a note. `mx-gameplay/domain/inventory-port.ts`'s header
+    // records the rule it is following: a mirror that renames a symbol
+    // typechecks, passes every local test, and yields a name that does not
+    // exist on repoint day.
+    renamedTypes: [],
+    // EMPTY, AND IT MUST STAY EMPTY. A probe row exempts its symbol from the
+    // "is it on the source's barrel?" check, and the two symbols this mirror
+    // is most likely to grow — `ItemType` and `StackCount` — are precisely the
+    // two that mc-sim's barrel does NOT hand back, because mc-sim deliberately
+    // does not re-export its own kernel mirror. They live in mx-gameplay's
+    // kernel mirrors instead. A probe row here would hide that.
+    capabilities: [],
+    // Empty, and unlike the capability array above this one carries no risk of
+    // hiding anything — a property row does not exempt its symbol from the
+    // barrel check. It is empty because an inventory port holds no block table:
+    // there is no column here to compare.
+    properties: [],
   },
   {
     // The FIRST mc-sim mirror this list has ever carried, and the reason it is
@@ -248,6 +378,28 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
       // The fourth, and the one whose ABSENCE from this array is what exposed
       // the structural defect. See the note below.
       { mirrorExport: 'canSupportAttachments', owner: 'mc-kernel', capability: 'canSupportAttachments' },
+    ],
+    // The SECOND mirror to carry property data, and it was not obvious from the
+    // outside: this file's four capability probes make it look like the flag
+    // mirror, but `SUPPORT_RULE_OVERRIDES` is twenty hand-written rows of
+    // kernel's `supportRule` COLUMN — a property, in the same table as `opacity`
+    // and read through the same `propertyOfBlockId`.
+    //
+    // It is the highest-consequence property in the table for this repository,
+    // because `canBlockStaySupported` joins it against `canSupportAttachments`
+    // and the file's own header records that THE PRECEDENCE IS THE PART THAT
+    // GOES WRONG — the per-block rule wins over the negative set, so a stale row
+    // here does not merely misplace one block, it silently reorders the two
+    // rules for it. That is why the row exists even though the column happens to
+    // agree today: a probe added while a table is correct is the only kind that
+    // was never written to match a table already known to be wrong.
+    //
+    // A struct-valued column, so the readings are compared as rendered JSON.
+    // `isSupportSensitiveBlockId` is left unprobed on the `transmitsLight`
+    // reasoning above: it is `isSupportSensitive(supportRuleOfBlockId(id))` on
+    // both sides and cannot disagree on its own.
+    properties: [
+      { mirrorExport: 'supportRuleOfBlockId', owner: 'mc-kernel', property: 'supportRule' },
     ],
   },
 ]
@@ -391,21 +543,70 @@ export type KnownFinding = {
 }
 
 /**
- * Empty, and that is the intended steady state.
+ * Two entries, both mc-worldgen's, both found by the FIRST run of the property
+ * probes — which is the same way this register got its first entry ever.
  *
- * It held one entry on the day this check was written: mx-gameplay's
- * `isReplaceable` omitted lava (block id 11), which mc-kernel's registry marks
- * `replaceable: true`. Falling sand and gravel did not displace lava and
- * placement treated a lava cell as occupied, while mx-gameplay's own
- * `chunk-store-mirror.test.ts` stayed green — because it pins the
- * transcription, not the source. That is the defect class this file exists for,
- * and the first run of `pnpm check:mirrors` found it.
+ * That first one was mx-gameplay's `isReplaceable` omitting lava (block id 11),
+ * which mc-kernel's registry marks `replaceable: true`. Falling sand and gravel
+ * did not displace lava and placement treated a lava cell as occupied, while
+ * mx-gameplay's own `chunk-store-mirror.test.ts` stayed green — because it pins
+ * the transcription, not the source. It was removed when the fix landed, which
+ * is what the register requires: a known finding fails the run once it is fixed,
+ * so this list cannot quietly become a set of switched-off checks.
  *
- * The entry was removed when the fix landed, which is what the register
- * requires: a known finding fails the run once it is fixed, so this list cannot
- * quietly become a set of switched-off checks.
+ * The two below are the property half's version of the same morning's work. Both
+ * are stale transcriptions of a kernel column that grew, both are in the DARK
+ * direction, and neither is fixable from here — the file that carries them is
+ * mc-worldgen's, with its own pull request, its own review and its own
+ * `pnpm verify`. Recording them is what lets the probe that FINDS them land
+ * today instead of landing after the fix, which is the trade the header above
+ * argues for at length.
+ *
+ * A NOTE ON HOW THESE TWO WILL EXPIRE, because it is sharper than it was for the
+ * lava entry. A property fingerprint carries every disagreeing id, so ANY change
+ * to either side re-fails the run: mc-worldgen adding one of the missing rows,
+ * and equally mc-kernel adding one more non-opaque block. The second case will
+ * look like an unrelated failure and is not one — it is this register doing
+ * exactly what it promises, refusing to keep suppressing a finding that has
+ * changed shape. Re-run with `MIRROR_FINGERPRINTS=1` and replace the entry, or
+ * better, delete it because mc-worldgen fixed the table.
  */
-export const KNOWN_FINDINGS: ReadonlyArray<KnownFinding> = []
+export const KNOWN_FINDINGS: ReadonlyArray<KnownFinding> = [
+  {
+    fingerprint:
+      'mc-worldgen/domain/kernel-vocabulary.ts|{"_tag":"PropertyDiffers","symbol":"opacityOfBlockId","owner":"mc-kernel","property":"opacity","disagreements":[{"id":"48 (ice)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"71 (wheat_crop)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"72 (potato_crop)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"73 (nether_wart_crop)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"74 (redstone_wire)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"75 (redstone_torch)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"76 (lever)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"77 (stone_button)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"78 (repeater)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"89 (end_portal)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"90 (chorus_flower)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"91 (chorus_plant)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"92 (dragon_egg)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"93 (end_crystal)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"94 (end_gateway)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"95 (end_rod)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"100 (purpur_slab)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"101 (purpur_stairs)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"106 (door)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"107 (door_open)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"108 (oak_stairs)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"112 (bed)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"114 (brewing_stand)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"118 (nether_portal)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"119 (fire)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""}]}',
+    summary:
+      "mc-worldgen's opacity transcription is stale on 25 ids. Kernel's roster grew past the " +
+      'block-35 boundary the table was last re-derived at, and ice, the three crops, the redstone ' +
+      'wiring, the End blocks, the slabs and stairs, both doors, the bed, the brewing stand, the ' +
+      'nether portal and fire are all transparentSolid in kernel and read as opaque here.',
+    owner: 'mc-worldgen',
+    fix:
+      'Add the 25 rows to NON_OPAQUE_BLOCK_OPACITIES in domain/kernel-vocabulary.ts and extend ' +
+      "test/kernel-mirror.test.ts's exhaustive pin to kernel's current range. The direction is " +
+      'the DARK one, which DN-7 names as non-conservative: every one of these cells is read as ' +
+      'blocking light that kernel says passes, so the light grid is too dark around them and ' +
+      'hostile-spawn.ts will permit a spawn it should refuse. Reachable only through ' +
+      'ChunkStore.setBlock, since generated terrain writes ids 0-10 — which is why no golden ' +
+      'fixture moved.',
+  },
+  {
+    fingerprint:
+      'mc-worldgen/domain/kernel-vocabulary.ts|{"_tag":"PropertyDiffers","symbol":"lightEmissionOfBlockId","owner":"mc-kernel","property":"lightEmission","disagreements":[{"id":"44 (amethyst_cluster)","mirror":"0","owner":"15"},{"id":"54 (redstone_ore)","mirror":"0","owner":"9"},{"id":"61 (deepslate_redstone_ore)","mirror":"0","owner":"9"},{"id":"68 (redstone_block)","mirror":"0","owner":"15"},{"id":"75 (redstone_torch)","mirror":"0","owner":"7"},{"id":"80 (redstone_lamp_lit)","mirror":"0","owner":"15"},{"id":"87 (end_portal_frame)","mirror":"0","owner":"1"},{"id":"88 (end_portal_frame_filled)","mirror":"0","owner":"3"},{"id":"89 (end_portal)","mirror":"0","owner":"15"},{"id":"94 (end_gateway)","mirror":"0","owner":"15"},{"id":"95 (end_rod)","mirror":"0","owner":"15"},{"id":"97 (ender_chest)","mirror":"0","owner":"15"},{"id":"118 (nether_portal)","mirror":"0","owner":"11"},{"id":"119 (fire)","mirror":"0","owner":"15"}]}',
+    summary:
+      "mc-worldgen's lightEmission transcription is stale on 14 ids. It carries the three " +
+      'emitters it was written with (lava, torch, glowstone) while kernel now has seventeen: the ' +
+      'redstone family, the amethyst cluster, the End blocks, the ender chest, the nether portal ' +
+      'and fire all emit in kernel and read as 0 here.',
+    owner: 'mc-worldgen',
+    fix:
+      'Add the 14 rows to BLOCK_LIGHT_EMISSION in domain/kernel-vocabulary.ts, with the levels ' +
+      "kernel gives (they are not uniform: 9 for redstone ore, 7 for a redstone torch, 1 and 3 " +
+      'for the two end_portal_frame states, 11 for the nether portal, 15 for the rest). Same ' +
+      'DARK direction as the opacity entry above, and the same reason nothing caught it. The ' +
+      "file's own comment calls the three-row table 'luck rather than design'; the luck ran out.",
+  },
+]
 
 /**
  * A finding's identity, for matching against `KNOWN_FINDINGS`.
@@ -520,11 +721,40 @@ export type CapabilityObservation = {
   readonly ownerAccepts: ReadonlyArray<string>
 }
 
+/** One block id, and what each side's property lookup returned for it. */
+export type PropertyReading = {
+  /** The id as the capability half renders one, e.g. `31 (rail)`. */
+  readonly id: string
+  /** The mirror's answer, rendered. JSON, so a struct column compares too. */
+  readonly mirror: string
+  /** The owning table's answer for the same id, rendered the same way. */
+  readonly owner: string
+}
+
+/**
+ * One property column read on both sides over the same id domain.
+ *
+ * Carries EVERY id rather than only the disagreements, which is the same
+ * division of labour `CapabilityObservation` keeps: the shell reports what it
+ * saw and the pure half decides what that means. It is also what makes the
+ * comparison CLOSED — a reading list that stops where the mirror's table stops
+ * would agree with a mirror that is missing rows, which is precisely how
+ * mc-worldgen's six-of-twenty-four opacity table survived a week of green runs.
+ */
+export type PropertyObservation = {
+  readonly mirrorExport: string
+  readonly owner: string
+  readonly property: string
+  /** Every id in the owning table's range, ascending. */
+  readonly readings: ReadonlyArray<PropertyReading>
+}
+
 /** What the shell observed about the mirror file. */
 export type MirrorObservation = {
   readonly values: ReadonlyArray<ValueObservation>
   readonly types: ReadonlyArray<TypeShape>
   readonly capabilities: ReadonlyArray<CapabilityObservation>
+  readonly properties: ReadonlyArray<PropertyObservation>
 }
 
 /** What the shell observed about the source repository's PUBLISHED surface. */
@@ -572,6 +802,19 @@ export type MirrorFinding =
       readonly capability: string
       readonly onlyInMirror: ReadonlyArray<string>
       readonly onlyInSource: ReadonlyArray<string>
+    }
+  | {
+      readonly _tag: 'PropertyDiffers'
+      readonly symbol: string
+      readonly owner: string
+      readonly property: string
+      readonly disagreements: ReadonlyArray<PropertyReading>
+    }
+  | {
+      readonly _tag: 'PropertyProbeEmpty'
+      readonly symbol: string
+      readonly owner: string
+      readonly property: string
     }
   | { readonly _tag: 'NothingObserved'; readonly detail: string }
 
@@ -812,6 +1055,51 @@ const compareCapabilities = (
 }
 
 /**
+ * Diff one property column, id by id, over the owning table's whole range.
+ *
+ * The empty-readings guard is the per-probe restatement of `compareSurfaces`'s
+ * empty-observation guard, and it is here for the same reason: a probe that read
+ * no ids compares nothing, and `disagreements.length > 0` is false for a column
+ * nobody looked at. That is the shape of failure kernel's audit §4.9.1(d)
+ * describes — 検査していない成功 — and it must be a finding, not a pass.
+ */
+const compareProperties = (
+  spec: MirrorSpec,
+  observed: ReadonlyArray<PropertyObservation>,
+): ReadonlyArray<MirrorFinding> => {
+  const findings: Array<MirrorFinding> = []
+
+  for (const property of observed) {
+    if (divergenceFor(spec, property.mirrorExport) !== undefined) {
+      continue
+    }
+
+    if (property.readings.length === 0) {
+      findings.push({
+        _tag: 'PropertyProbeEmpty',
+        symbol: property.mirrorExport,
+        owner: property.owner,
+        property: property.property,
+      })
+      continue
+    }
+
+    const disagreements = property.readings.filter((reading) => reading.mirror !== reading.owner)
+    if (disagreements.length > 0) {
+      findings.push({
+        _tag: 'PropertyDiffers',
+        symbol: property.mirrorExport,
+        owner: property.owner,
+        property: property.property,
+        disagreements,
+      })
+    }
+  }
+
+  return findings
+}
+
+/**
  * Compare one mirror against its source.
  *
  * The empty-observation guard comes FIRST and is not negotiable. Every other
@@ -854,6 +1142,7 @@ export const compareSurfaces = (
     ...compareValues(spec, mirror.values, source),
     ...compareTypes(spec, mirror.types, source),
     ...compareCapabilities(spec, mirror.capabilities),
+    ...compareProperties(spec, mirror.properties),
   ]
 }
 
@@ -971,6 +1260,35 @@ export const describeMirrorFinding = (spec: MirrorSpec, finding: MirrorFinding):
       )
       return lines.join('\n')
     }
+    case 'PropertyDiffers': {
+      const rows = finding.disagreements.map(
+        (entry) => `      ${entry.id}: mirror ${entry.mirror}, ${finding.owner} ${entry.owner}`,
+      )
+      return [
+        `${at}: ${finding.symbol} does not agree with ${finding.owner}'s "${finding.property}" ` +
+          `property on ${String(finding.disagreements.length)} id(s). Every id in ${finding.owner}'s ` +
+          'range was read on both sides, so these are the only ones that differ:',
+        ...rows,
+        // The direction is the part that decides how bad it is, and neither the
+        // ids nor the values say it on their own. A missing row does not read as
+        // an error — it reads as the DEFAULT, which for `opacity` is `'opaque'`
+        // and therefore darker than the truth. mc-worldgen's DN-7 names that as
+        // the non-conservative direction: a cell read darker than it is lets a
+        // hostile spawn where the rule would have refused.
+        '      An id absent from a hand-written property table does not fail — it silently reads',
+        `      as ${finding.owner}'s default. Check the DIRECTION of each row above before sizing`,
+        '      this: for opacity the default is the DARK answer, and dark is the direction that',
+        '      spawns mobs. Adding the row to the source table should have been the whole change.',
+      ].join('\n')
+    }
+    case 'PropertyProbeEmpty':
+      return (
+        `${at}: the probe on ${finding.symbol} read ZERO ids of ${finding.owner}'s ` +
+        `"${finding.property}" property, so it compared nothing and would have reported ` +
+        'agreement. Either the owning table exposes an empty id range or the probe is broken. ' +
+        'A column compared against nothing agrees with everything, which is the one result this ' +
+        'checker must never produce.'
+      )
     case 'NothingObserved':
       return `${at}: ${finding.detail}`
   }
@@ -994,6 +1312,15 @@ export type MirrorOutcome =
       readonly valuesCompared: number
       readonly typesCompared: number
       readonly capabilitiesCompared: number
+      readonly propertiesCompared: number
+      /**
+       * Ids read across every property probe on this mirror.
+       *
+       * Printed because "1 property probe" and "1 property probe that read one
+       * id" look identical in a count of probes, and the difference between them
+       * is a closed comparison and a spot-check.
+       */
+      readonly propertyIdsCompared: number
     }
   | { readonly _tag: 'Skipped'; readonly spec: MirrorSpec; readonly reason: string }
 
@@ -1025,6 +1352,11 @@ export const compareMirror = (
     valuesCompared: mirror.values.length,
     typesCompared: mirror.types.length,
     capabilitiesCompared: mirror.capabilities.length,
+    propertiesCompared: mirror.properties.length,
+    propertyIdsCompared: mirror.properties.reduce(
+      (total, property) => total + property.readings.length,
+      0,
+    ),
   }
 }
 
@@ -1210,7 +1542,11 @@ export const describeMirrorRun = (
     }
     const counts =
       `${String(outcome.valuesCompared)} value(s), ${String(outcome.typesCompared)} type(s), ` +
-      `${String(outcome.capabilitiesCompared)} capability probe(s)`
+      `${String(outcome.capabilitiesCompared)} capability probe(s), ` +
+      `${String(outcome.propertiesCompared)} property probe(s)` +
+      (outcome.propertiesCompared > 0
+        ? ` over ${String(outcome.propertyIdsCompared)} id reading(s)`
+        : '')
     const status =
       outcome.findings.length > 0 ? 'FAIL' : outcome.known.length > 0 ? 'KNOWN' : 'ok   '
     lines.push(

@@ -460,12 +460,19 @@ export type KnownRepointFinding = {
 }
 
 /**
- * The `FrameServices` divergence, once per repository that carries it.
+ * The `FrameServices` divergence, once per TSCONFIG PROJECT that carries it.
  *
- * These are not three defects. They are ONE defect in a contract, transcribed
+ * These are not four defects. They are ONE defect in a contract, transcribed
  * into three repositories, which is the failure mode this whole directory
  * exists to make visible — and the reason the entries are listed separately is
- * that each has a different owner and each needs its own pull request.
+ * that each needs its own pull request, against a repository that must also
+ * keep compiling standalone in its own CI.
+ *
+ * FOUR ENTRIES, THREE REPOSITORIES. mx-gameplay carries two because
+ * `tsconfig.preview.json` deliberately does not include `test/**`, so its
+ * preview app holds a second copy of the declaration rather than importing the
+ * test one. One owner, two pull-request-sized edits, and the register counts
+ * the edits.
  *
  * The fix is NOT to change the mirrors. `FrameServices = never` is a correct
  * and deliberate choice for as long as kernel is unpublished, for the reason
@@ -478,21 +485,85 @@ export type KnownRepointFinding = {
  * which is the point of measuring it now.
  */
 export const KNOWN_REPOINT_FINDINGS: ReadonlyArray<KnownRepointFinding> = [
-  // EMPTY, and it was not empty for long.
+  // FOUR ENTRIES, and this array was empty for exactly one commit.
   //
   // The first run of this gate recorded seventeen findings across mx-gameplay,
   // mx-ui and mx-redstone, every one of them the same shape: a test context that
   // ran a frame stage without providing a `ClockPort`, against kernel's real
   // `FrameServices = ClockPort`. They were listed here rather than failing the
   // run, because none of them could be fixed from this repository -- each file
-  // belongs to another repository with its own pull request.
+  // belongs to another repository with its own pull request. They were then all
+  // seventeen "fixed at the source" and this array went empty, which was true
+  // as far as it went and is no longer the useful way to say it.
   //
-  // All seventeen are now fixed at the source, and this array is the record of
-  // that rather than a backlog. Note what the gate does when an entry here stops
-  // reproducing: it SAYS SO, by name, instead of quietly passing. A known-defect
-  // list that is allowed to stay more pessimistic than reality is how a project
-  // ends up carrying warnings nobody believes -- so the list is checked in both
-  // directions and going green is an event that has to be written down.
+  // THE SEVENTEEN WERE NOT SEVENTEEN DEFECTS. They were seventeen CALL SITES of
+  // one, and what landed at the source was not seventeen fixes but a funnel:
+  // every site now resolves through a single `Layer.Layer<FrameServices>`
+  // declaration, one per tsconfig project. The four below are what is left when
+  // that funnelling is done -- the irreducible floor of a divergence, not a
+  // backlog that someone forgot to work. Each is ONE LINE on publish day, and
+  // each of the four files already carries its own replacement in its header.
+  //
+  // WHY THE FOUR ARE IRREDUCIBLE, on the merits and not merely on principle.
+  // `ClockPort` is a `Context.Tag`, and Effect keys the requirement channel on
+  // the tag's TYPE rather than on its identifier string, so only a value typed
+  // from `@nerima-games/mc-kernel` can discharge a `ClockPort` requirement.
+  // Restating the tag locally with the identical identifier string was MEASURED
+  // rather than assumed, and it produces a distinct type -- so the route every
+  // mirror header forbids on principle also fails on the merits. Nor may any of
+  // these repositories take a dependency on mc-kernel before it is published,
+  // because each also has to keep building standalone in its own CI. There is
+  // no repository from which this can be closed today. That is the test for
+  // membership here, and it is the only test.
+  //
+  // WHAT THIS LIST IS NOT FOR, recorded because the temptation was live on the
+  // run that added these. That same run also failed the mc-sim inventory
+  // repoint, and those findings were FIXED rather than recorded -- mc-sim's
+  // kernel mirror carried `ITEM_TYPES` at twenty-three literals against
+  // kernel's ninety-seven, and a repository that owns a stale transcription can
+  // always land the transcription. The test is not "is the finding real": the
+  // inventory defect was extremely real, and would have refused seventy-four of
+  // kernel's items on repoint day. The test is "can ANY repository land the fix
+  // today", and a register that absorbs the ones where the answer is yes stops
+  // being evidence and becomes somewhere to put things.
+  //
+  // Note what the gate does when an entry here stops reproducing: it SAYS SO,
+  // by name, instead of quietly passing. A known-defect list that is allowed to
+  // stay more pessimistic than reality is how a project ends up carrying
+  // warnings nobody believes -- so the list is checked in both directions and
+  // going green is an event that has to be written down.
+  {
+    fingerprint:
+      "mx-gameplay/domain/frame-contract.ts|tsconfig.test.json|test/support/frame-services.ts|TS2322|Type 'Layer<never, never, never>' is not assignable to type 'Layer<ClockPort, never, never>'.",
+    summary:
+      'mx-gameplay test harness: FrameServicesLayer is Layer.empty, and kernel’s FrameServices is ClockPort',
+    owner: 'mx-gameplay',
+    fix: 'Replace `Layer.empty` in test/support/frame-services.ts with `FixedClockLayer({ monotonicSecs: MonotonicTimeSecs(0), wallClockEpochMillis: EpochMillis(0) })` from @nerima-games/mc-kernel. Every stage-running test already resolves through this one declaration.',
+  },
+  {
+    fingerprint:
+      "mx-gameplay/domain/frame-contract.ts|tsconfig.preview.json|apps/preview-mining-site/frame-services.ts|TS2322|Type 'Layer<never, never, never>' is not assignable to type 'Layer<ClockPort, never, never>'.",
+    summary:
+      'mx-gameplay preview app: the second copy of FrameServicesLayer, because tsconfig.preview.json excludes test/**',
+    owner: 'mx-gameplay',
+    fix: 'The same one-line substitution as the test harness, in apps/preview-mining-site/frame-services.ts. It is a separate edit and not a duplicate: the preview is a separate tsconfig project and deliberately cannot import the test copy.',
+  },
+  {
+    fingerprint:
+      "mx-ui/domain/frame-contract.ts|tsconfig.test.json|test/frame-services.ts|TS2322|Type 'Layer<never, never, never>' is not assignable to type 'Layer<ClockPort, never, never>'.",
+    summary:
+      'mx-ui test harness: FrameServicesLayer is Layer.empty, and kernel’s FrameServices is ClockPort',
+    owner: 'mx-ui',
+    fix: 'Replace `Layer.empty` in test/frame-services.ts with `FixedClockLayer({ monotonicSecs: MonotonicTimeSecs(0), wallClockEpochMillis: EpochMillis(0) })` from @nerima-games/mc-kernel.',
+  },
+  {
+    fingerprint:
+      "mx-redstone/domain/frame-contract.ts|tsconfig.test.json|test/frame-services.ts|TS2322|Type 'Layer<never, never, never>' is not assignable to type 'Layer<ClockPort, never, never>'.",
+    summary:
+      'mx-redstone test harness: FrameServicesLayer is Layer.empty, and kernel’s FrameServices is ClockPort',
+    owner: 'mx-redstone',
+    fix: 'Replace `Layer.empty` in test/frame-services.ts with `FixedClockLayer({ monotonicSecs: MonotonicTimeSecs(0), wallClockEpochMillis: EpochMillis(0) })` from @nerima-games/mc-kernel.',
+  },
 ]
 
 // ---------------------------------------------------------------------------

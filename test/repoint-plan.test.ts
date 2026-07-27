@@ -94,8 +94,54 @@ describe('REPOINT_SPECS', () => {
     expect(unmatchedRepointSpecs([stray], MIRROR_SPECS)).toEqual([stray])
   })
 
+  /*
+   * The second source repository this gate has ever pointed at, and the row
+   * that found a defect on its first run.
+   *
+   * `mx-gameplay/domain/inventory-port.ts` mirrors mc-sim's `InventoryService`
+   * whole — the api plus the crafting vocabulary under it — and repointing it
+   * DID NOT COMPILE, for one cause: mc-sim's own kernel mirror carries
+   * `ITEM_TYPES` at 23 literals against kernel's 97, and `ItemType` is a
+   * PARAMETER type on `add`. `pnpm check:mirrors` reports that mirror as `ok`,
+   * because a closed literal union has no members for a text comparison to
+   * read (`test/mirror-contract.test.ts` pins that blind spot). This row is
+   * what makes the difference between the two gates concrete.
+   */
+  it('carries the mc-sim inventory mirror, whose types check:mirrors cannot compare', () => {
+    const inventory = REPOINT_SPECS.find(
+      (candidate) =>
+        candidate.repository === 'mx-gameplay' && candidate.file === 'domain/inventory-port.ts',
+    )
+
+    expect(inventory?.packageName).toBe('@nerima-games/mc-sim')
+    expect(inventory?.source).toBe('mc-sim')
+  })
+
+  it('rewrites the inventory mirror at the depth its call sites import it from', () => {
+    // `stages/registration.ts` and the tests import it as `'../domain/...'`,
+    // the preview as `'../../domain/...'`, and the mirror's own neighbours as
+    // `'./...'`. All three must be rewritten, or the repoint would compile a
+    // file that still points at a deleted module.
+    const source = [
+      "import { InventoryService } from '../domain/inventory-port'",
+      "import type { Slot } from '../../domain/inventory-port'",
+      "import type { Inventory } from './inventory-port'",
+      // ...and a near-miss that must NOT be rewritten.
+      "import { x } from './inventory-port-extra'",
+    ].join('\n')
+
+    const rewritten = rewriteMirrorImports(source, 'inventory-port', '@nerima-games/mc-sim')
+
+    expect(rewritten.rewrites).toBe(3)
+    expect(rewritten.text).toContain("from '@nerima-games/mc-sim'")
+    expect(rewritten.text).toContain("from './inventory-port-extra'")
+  })
+
   it('derives the module name imports use from the file path', () => {
     expect(mirrorModuleName(spec)).toBe('frame-contract')
+    expect(
+      mirrorModuleName({ ...spec, file: 'domain/inventory-port.ts' }),
+    ).toBe('inventory-port')
     expect(mirrorModuleName({ ...spec, file: 'domain/kernel-vocabulary.ts' })).toBe(
       'kernel-vocabulary',
     )

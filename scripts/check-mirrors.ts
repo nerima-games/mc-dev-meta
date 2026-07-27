@@ -18,12 +18,19 @@
  * executes fifteen repositories' code, which deserves a justification.
  *
  * The defects being hunted are values: a block id, a brand's refinement
- * predicate, a `Context.Tag`'s key. All three are ordinary runtime objects, and
- * the mirror and its source can simply be asked. Reading them out of source
- * text instead would mean re-implementing `new Set([5, 8])`, `Brand.refined`
- * and `Context.Tag(...)` in a parser, and then maintaining a second, worse
- * TypeScript. Importing is not the lazy option here — it is the only one that
- * cannot be wrong about what the code means.
+ * predicate, a `Context.Tag`'s key, a block's opacity class. All of them are
+ * ordinary runtime objects, and the mirror and its source can simply be asked.
+ * Reading them out of source text instead would mean re-implementing
+ * `new Set([5, 8])`, `Brand.refined` and `Context.Tag(...)` in a parser, and
+ * then maintaining a second, worse TypeScript. Importing is not the lazy option
+ * here — it is the only one that cannot be wrong about what the code means.
+ *
+ * It also buys the property half for nothing extra. `opacity` and `supportRule`
+ * are resolved through kernel's override-plus-default mechanism, so the value of
+ * a column for an id is not READABLE anywhere: it is the row's override if the
+ * row has one and `BLOCK_PROPERTY_DEFAULTS` otherwise. A text comparison would
+ * have to reimplement that resolution. `propertyOfBlockId(id, 'opacity')` just
+ * answers.
  *
  * The cost is that this half needs each clone's `node_modules` (the mirrors
  * import `effect`). An uninstalled workspace is a SKIP, for the same reason an
@@ -96,6 +103,7 @@ import {
   compareMirror,
   describeMirrorRun,
   describeProvenance,
+  fingerprintFinding,
   mirrorPath,
   mirrorRunExitCode,
   MIRROR_SPECS,
@@ -104,6 +112,7 @@ import {
   type MirrorObservation,
   type MirrorOutcome,
   type MirrorSpec,
+  type PropertyObservation,
   type SampleVerdict,
   type SourceObservation,
   type ValueObservation,
@@ -134,6 +143,17 @@ const ENTRY_POINT = 'index.ts'
 const CAPABILITY_LOOKUP = 'capabilityOfBlockId'
 const BLOCK_TYPE_LOOKUP = 'blockTypeOfId'
 const BLOCK_ID_MAX_NAME = 'BLOCK_ID_MAX'
+
+/**
+ * The PROPERTY table's generic accessor, the sibling of `CAPABILITY_LOOKUP`.
+ *
+ * A separate name because kernel splits the two at design time: booleans live in
+ * `domain/block-capabilities.ts` behind `capabilityOfBlockId`, typed columns in
+ * `domain/block-properties.ts` behind this one. Asserted to exist for the same
+ * reason the capability lookup is — if kernel renames it, this check must fail
+ * loudly rather than quietly stop probing a column it claims to compare.
+ */
+const PROPERTY_LOOKUP = 'propertyOfBlockId'
 
 /** Raised for the conditions the header calls failures rather than absence. */
 class MirrorCheckError extends Error {}
@@ -266,6 +286,68 @@ const typesIn = (label: string, text: string): ReadonlyArray<TypeShape> => {
 }
 
 // ---------------------------------------------------------------------------
+// The id domain both kinds of probe run over
+// ---------------------------------------------------------------------------
+
+/**
+ * Every id the owning table can name, and how to render one.
+ *
+ * Shared by the capability and property halves so that the two cannot silently
+ * come to disagree about what "the whole range" means. A property probe over a
+ * SHORTER range than the capability probes would be the spot-check this file
+ * exists to replace: a closed comparison over the owner's full range fails on an
+ * untranscribed row, and a comparison that stops where the mirror's own table
+ * stops agrees with a mirror that is missing rows.
+ */
+type BlockIdDomain = {
+  readonly ids: ReadonlyArray<number>
+  readonly render: (id: number) => string
+}
+
+const blockIdDomain = (ownerName: string, owner: Readonly<Record<string, unknown>>): BlockIdDomain => {
+  const typeOfId = owner[BLOCK_TYPE_LOOKUP]
+  const maximum = owner[BLOCK_ID_MAX_NAME]
+  if (typeof typeOfId !== 'function' || typeof maximum !== 'number') {
+    throw new MirrorCheckError(
+      `${ownerName}: expected its barrel to export ${BLOCK_TYPE_LOOKUP} and ${BLOCK_ID_MAX_NAME}. ` +
+        'Without them no probe can be run over its id range, and running nothing must not be ' +
+        'reported as agreement.',
+    )
+  }
+
+  return {
+    ids: Array.from({ length: maximum + 1 }, (_unused, id) => id),
+    render: (id: number): string => {
+      const type = (typeOfId as (candidate: number) => unknown)(id)
+      return typeof type === 'string' ? `${String(id)} (${type})` : `${String(id)} (unassigned)`
+    },
+  }
+}
+
+/**
+ * The mirror's side of a probe, as a callable.
+ *
+ * A stale probe is a FAILURE and not a skip — the header's rule that "a spec
+ * that names an export the mirror does not have must never be a silent no-op".
+ */
+const probedExport = (
+  spec: MirrorSpec,
+  mirror: Readonly<Record<string, unknown>>,
+  mirrorExport: string,
+  kind: string,
+): ((id: number) => unknown) => {
+  const value = mirror[mirrorExport]
+  if (typeof value !== 'function') {
+    throw new MirrorCheckError(
+      `${mirrorPath(spec)}: MIRROR_SPECS declares a ${kind} probe on "${mirrorExport}", which the ` +
+        'mirror does not export as a function. Either the mirror changed and the probe is stale, ' +
+        'or the probe is a typo. It must not silently do nothing.',
+    )
+  }
+  return value as (id: number) => unknown
+}
+
+// ---------------------------------------------------------------------------
 // Capability probes
 // ---------------------------------------------------------------------------
 
@@ -275,44 +357,85 @@ const readCapability = (
   owner: Readonly<Record<string, unknown>>,
   probe: MirrorSpec['capabilities'][number],
 ): CapabilityObservation => {
-  const mirrorPredicate = mirror[probe.mirrorExport]
-  if (typeof mirrorPredicate !== 'function') {
-    throw new MirrorCheckError(
-      `${mirrorPath(spec)}: MIRROR_SPECS declares a capability probe on "${probe.mirrorExport}", ` +
-        'which the mirror does not export as a function. Either the mirror changed and the probe ' +
-        'is stale, or the probe is a typo. It must not silently do nothing.',
-    )
-  }
+  const mirrorPredicate = probedExport(spec, mirror, probe.mirrorExport, 'capability')
 
   const lookup = owner[CAPABILITY_LOOKUP]
-  const typeOfId = owner[BLOCK_TYPE_LOOKUP]
-  const maximum = owner[BLOCK_ID_MAX_NAME]
-  if (typeof lookup !== 'function' || typeof typeOfId !== 'function' || typeof maximum !== 'number') {
+  if (typeof lookup !== 'function') {
     throw new MirrorCheckError(
-      `${probe.owner}: expected its barrel to export ${CAPABILITY_LOOKUP}, ${BLOCK_TYPE_LOOKUP} ` +
-        `and ${BLOCK_ID_MAX_NAME}. Without them a capability probe cannot be run, and running ` +
-        'nothing must not be reported as agreement.',
+      `${probe.owner}: expected its barrel to export ${CAPABILITY_LOOKUP}. Without it a ` +
+        'capability probe cannot be run, and running nothing must not be reported as agreement.',
     )
   }
 
-  const ids = Array.from({ length: maximum + 1 }, (_unused, id) => id)
-  const render = (id: number): string => {
-    const type = (typeOfId as (candidate: number) => unknown)(id)
-    return typeof type === 'string' ? `${String(id)} (${type})` : `${String(id)} (unassigned)`
-  }
+  const { ids, render } = blockIdDomain(probe.owner, owner)
 
   return {
     mirrorExport: probe.mirrorExport,
     owner: probe.owner,
     capability: probe.capability,
-    mirrorAccepts: ids
-      .filter((id) => (mirrorPredicate as (candidate: number) => unknown)(id) === true)
-      .map(render),
+    mirrorAccepts: ids.filter((id) => mirrorPredicate(id) === true).map(render),
     ownerAccepts: ids
       .filter(
         (id) => (lookup as (candidate: number, flag: string) => unknown)(id, probe.capability) === true,
       )
       .map(render),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Property probes
+// ---------------------------------------------------------------------------
+
+/**
+ * Render one property value so that two of them can be compared as strings.
+ *
+ * `JSON.stringify` rather than `String`, because the columns are not all
+ * scalars: `opacity` is a string enum, `lightEmission` is a number, and
+ * `supportRule` is a struct whose arms differ by a `kind` field and a block
+ * list. `String({kind:'none'})` is `[object Object]` for every rule there is,
+ * which would report a mirror that had the wrong rule on every id as agreeing on
+ * all of them — the failure mode this whole file is built against.
+ *
+ * Key order is not normalised and does not need to be: both sides of every
+ * probed column are built from object literals whose key order is part of the
+ * declaration being mirrored, so a reordering is itself a divergence worth
+ * seeing. If that ever produces noise, the fix is a canonicalising renderer here
+ * and not a looser comparison.
+ */
+const renderProperty = (value: unknown): string => JSON.stringify(value) ?? String(value)
+
+const readProperty = (
+  spec: MirrorSpec,
+  mirror: Readonly<Record<string, unknown>>,
+  owner: Readonly<Record<string, unknown>>,
+  probe: MirrorSpec['properties'][number],
+): PropertyObservation => {
+  const mirrorLookup = probedExport(spec, mirror, probe.mirrorExport, 'property')
+
+  const lookup = owner[PROPERTY_LOOKUP]
+  if (typeof lookup !== 'function') {
+    throw new MirrorCheckError(
+      `${probe.owner}: expected its barrel to export ${PROPERTY_LOOKUP}. Without it a property ` +
+        'probe cannot be run, and running nothing must not be reported as agreement.',
+    )
+  }
+
+  const { ids, render } = blockIdDomain(probe.owner, owner)
+
+  return {
+    mirrorExport: probe.mirrorExport,
+    owner: probe.owner,
+    property: probe.property,
+    // EVERY id, not only the ones that differ. The domain half does the diff;
+    // handing it a pre-filtered list would move the decision into the shell and
+    // make it untestable from fixtures, which is the split the whole check keeps.
+    readings: ids.map((id) => ({
+      id: render(id),
+      mirror: renderProperty(mirrorLookup(id)),
+      owner: renderProperty(
+        (lookup as (candidate: number, name: string) => unknown)(id, probe.property),
+      ),
+    })),
   }
 }
 
@@ -332,6 +455,11 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
   for (const probe of spec.capabilities) {
     if (!present.has(probe.owner)) {
       return skip(spec, `${probe.owner}, which owns the "${probe.capability}" table, is not cloned`)
+    }
+  }
+  for (const probe of spec.properties) {
+    if (!present.has(probe.owner)) {
+      return skip(spec, `${probe.owner}, which owns the "${probe.property}" property, is not cloned`)
     }
   }
 
@@ -368,25 +496,51 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
     )
   }
 
-  const owners = await Promise.all(
-    spec.capabilities.map(async (probe) => ({
-      probe,
-      owner: await loadModule(path.join(repoDir(probe.owner), ENTRY_POINT)),
-    })),
+  // Both probe kinds read the same owning barrels, so they are loaded once for
+  // the union of the two lists. `loadModule` caches anyway; doing it in one pass
+  // is what keeps the skip-on-uninstalled decision in a single place.
+  const ownerNames = [
+    ...new Set([
+      ...spec.capabilities.map((probe) => probe.owner),
+      ...spec.properties.map((probe) => probe.owner),
+    ]),
+  ]
+  const owners = new Map(
+    await Promise.all(
+      ownerNames.map(
+        async (name) =>
+          [name, await loadModule(path.join(repoDir(name), ENTRY_POINT))] as const,
+      ),
+    ),
   )
 
-  const capabilities: Array<CapabilityObservation> = []
-  for (const { probe, owner } of owners) {
-    if (!owner.ok) {
-      if (owner.uninstalled) {
-        return skip(spec, `${probe.owner} is cloned but not installed (${owner.detail})`)
-      }
-      throw new MirrorCheckError(
-        `${probe.owner}/${ENTRY_POINT} could not be imported: ${owner.detail}`,
-      )
+  for (const name of ownerNames) {
+    const owner = owners.get(name)
+    if (owner === undefined || owner.ok) {
+      continue
     }
-    capabilities.push(readCapability(spec, mirrorModule.module, owner.module, probe))
+    if (owner.uninstalled) {
+      return skip(spec, `${name} is cloned but not installed (${owner.detail})`)
+    }
+    throw new MirrorCheckError(`${name}/${ENTRY_POINT} could not be imported: ${owner.detail}`)
   }
+
+  /** Every owner above is loaded and `ok` by here; this narrows it for the probes. */
+  const ownerModule = (name: string): Readonly<Record<string, unknown>> => {
+    const owner = owners.get(name)
+    if (owner === undefined || !owner.ok) {
+      throw new MirrorCheckError(`${name}/${ENTRY_POINT} was not loaded.`)
+    }
+    return owner.module
+  }
+
+  const capabilities: Array<CapabilityObservation> = spec.capabilities.map((probe) =>
+    readCapability(spec, mirrorModule.module, ownerModule(probe.owner), probe),
+  )
+
+  const properties: Array<PropertyObservation> = spec.properties.map((probe) =>
+    readProperty(spec, mirrorModule.module, ownerModule(probe.owner), probe),
+  )
 
   const lockTypes = typesInApiLock(lockText)
   if (!lockTypes.ok) {
@@ -399,6 +553,7 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
     values: observeValues(mirrorModule.module),
     types: typesIn(mirrorPath(spec), mirrorText).filter((shape) => shape.exported),
     capabilities,
+    properties,
   }
 
   const source: SourceObservation = {
@@ -442,6 +597,27 @@ export const main = async (): Promise<number> => {
     },
     Promise.resolve([]),
   )
+
+  // `KNOWN_FINDINGS` says a fingerprint is "produced by running the check, not
+  // written by hand, so an entry cannot be widened by accident" — and until this
+  // block existed there was no way to run the check and GET one. Recording a
+  // known finding meant reassembling the JSON by eye, which is exactly the
+  // accidental widening the opacity of the field is meant to prevent, and a
+  // property finding carrying twenty-five rows makes that hopeless rather than
+  // merely tedious.
+  //
+  // Off by default and printing only. It cannot change a verdict: the exit code
+  // is computed below from the same outcomes either way.
+  if (process.env['MIRROR_FINGERPRINTS'] === '1') {
+    for (const outcome of outcomes) {
+      if (outcome._tag !== 'Compared') {
+        continue
+      }
+      for (const finding of outcome.findings) {
+        console.log(`FINGERPRINT ${fingerprintFinding(outcome.spec, finding)}`)
+      }
+    }
+  }
 
   const exitCode = mirrorRunExitCode(outcomes)
   const report = describeMirrorRun(outcomes)
