@@ -14,12 +14,12 @@
     {
       "name": "mc-meshing",
       "url": "https://github.com/nerima-games/mc-meshing.git",
-      "ref": "0089592fd75fb059ecaabef4775214b374e03845"
+      "ref": "cce4e14815b9d2a7012bc4f8600271bb5bbd41bd"
     },
     {
       "name": "mc-physics",
       "url": "https://github.com/nerima-games/mc-physics.git",
-      "ref": "dd834a0b01d499154c260d974520801f824112f5"
+      "ref": "d76528cbd9be2d0382239a82549c550301e4b748"
     },
     {
       "name": "mc-save",
@@ -29,12 +29,12 @@
     {
       "name": "mc-audio",
       "url": "https://github.com/nerima-games/mc-audio.git",
-      "ref": "2d483b7d460b1eb230224d4cd1b6ad2faa4989c3"
+      "ref": "fc601352488ad9fb59f44e5cd77d8ed5384cb646"
     },
     {
       "name": "mc-worldgen",
       "url": "https://github.com/nerima-games/mc-worldgen.git",
-      "ref": "9eb284d4d370cd0a8f989341b779e464c4afe48f"
+      "ref": "fa361b6722d5c956dfce8a18d7c683093e5ceca1"
     },
     {
       "name": "mc-sim",
@@ -54,7 +54,7 @@
     {
       "name": "mx-gameplay",
       "url": "https://github.com/nerima-games/mx-gameplay.git",
-      "ref": "50395a480f2a907b1b3e1dbef8a47a3d3721f31f"
+      "ref": "d68427f0a85f0d8417ba782a45b3590876739494"
     },
     {
       "name": "mx-redstone",
@@ -74,7 +74,7 @@
     {
       "name": "mc-compose",
       "url": "https://github.com/nerima-games/mc-compose.git",
-      "ref": "5b4ea502bbcbaaf441f9f62d379d1a02e77206f0"
+      "ref": "65758b3d1f7677a28bbe1ef4b60347c9b54f3c94"
     }
   ]
 }
