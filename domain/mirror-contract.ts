@@ -183,6 +183,33 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     capabilities: [
       { mirrorExport: 'fallsWhenUnsupported', owner: 'mc-kernel', capability: 'fallsWhenUnsupported' },
       { mirrorExport: 'isReplaceable', owner: 'mc-kernel', capability: 'replaceable' },
+      // Added after a drift this list could not see. The mirror restates THREE
+      // of kernel's capabilities and only two were probed, so
+      // `NON_SPAWN_SURFACE_IDS` was free to disagree with kernel — and did, on
+      // `oak_log`, in both repositories at once.
+      //
+      // The lesson is about the shape of this array rather than about one id: a
+      // probe list shorter than the set of capabilities a mirror restates
+      // reports success it has not checked, which is the failure mode
+      // `domain/mirror-contract.ts`'s own header calls "worse than no checker".
+      // A mirror that restates a fourth capability must gain a fourth row here.
+      //
+      // Note this one is a NEGATIVE set on both sides (kernel defaults it to
+      // `true`); the probe compares the accepted sets over every representable
+      // id, so the polarity is handled by evaluation rather than by convention.
+      //
+      // SEQUENCING — this row cannot land before `repos.json` is bumped.
+      // `mx-gameplay` only began exporting `validSpawnSurface` after the
+      // revision currently pinned, so against today's manifest this probe hits
+      // the "declares a probe the mirror does not export" failure rather than
+      // comparing anything. That failure is the checker behaving correctly (a
+      // stale spec must not silently no-op), but it means the order is:
+      // `pnpm update:manifest` && `pnpm sync` first, this row second.
+      //
+      // Verified against the un-pinned working trees, both ways: it reports
+      // agreement when kernel's registry and the mirror match, and it goes red
+      // when kernel's roster is rolled back underneath the mirror.
+      { mirrorExport: 'validSpawnSurface', owner: 'mc-kernel', capability: 'validSpawnSurface' },
     ],
   },
 ]
