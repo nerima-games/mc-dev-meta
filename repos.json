@@ -14,7 +14,7 @@
     {
       "name": "mc-meshing",
       "url": "https://github.com/nerima-games/mc-meshing.git",
-      "ref": "cce4e14815b9d2a7012bc4f8600271bb5bbd41bd"
+      "ref": "a40c64954ea6c68d382fad1d99b3e771e085e248"
     },
     {
       "name": "mc-physics",
@@ -39,12 +39,12 @@
     {
       "name": "mc-sim",
       "url": "https://github.com/nerima-games/mc-sim.git",
-      "ref": "c8e8dfac8935679f989cbb16353e3f4ed9b80035"
+      "ref": "3d75ce299d4a642f34bac85a0c2c2b57d602c00a"
     },
     {
       "name": "mc-render",
       "url": "https://github.com/nerima-games/mc-render.git",
-      "ref": "f4e9f18902a7f2383f03ef6ca118ac28a0f60cf5"
+      "ref": "c99ac01e4ca7d6edd34616946689097e268dfd50"
     },
     {
       "name": "mc-playground-kit",
