@@ -124,13 +124,24 @@ export type RepointSpec = {
 /**
  * The repoints this gate performs.
  *
- * Only `frame-contract.ts` for now, and that is a scope decision rather than an
- * oversight. It is the mirror whose deletion the freeze checklist is actually
- * waiting on, it is carried by three repositories rather than one — which is
- * what turned a finding into a systemic one — and its source is the repository
- * being frozen. The `kernel-vocabulary.ts` mirrors are the obvious next five
- * rows; they are left out of the first cut so that the gate's own failure modes
- * are understood on a small set first.
+ * `frame-contract.ts` was the first cut, and that was a scope decision rather
+ * than an oversight: it is the mirror whose deletion the freeze checklist is
+ * actually waiting on, it is carried by three repositories rather than one —
+ * which is what turned a finding into a systemic one — and its source is the
+ * repository being frozen. The `kernel-vocabulary.ts` mirrors are still the
+ * obvious next five rows; they are left out so that the gate's own failure
+ * modes are understood on a small set first.
+ *
+ * `inventory-port.ts` is the SECOND source repository this gate has ever
+ * pointed at, and it is here for a reason `frame-contract` does not have. It is
+ * the widest mirror in the workspace — the whole of `InventoryServiceApi` plus
+ * mc-sim's crafting vocabulary underneath it — and the part of it that is
+ * hardest to check is the part `check:mirrors` deliberately does not look at:
+ * MEMBER TYPES. `domain/type-shape.ts` compares names and optionality only,
+ * because the mirrors diverge in their types on purpose, so `ItemStack.count`
+ * being `number` here and `StackCount` in mc-sim would pass that gate and fail
+ * a compiler. mx-gameplay declines the divergence and transcribes the brand;
+ * this row is what makes the declining checkable.
  */
 export const REPOINT_SPECS: ReadonlyArray<RepointSpec> = [
   {
@@ -138,6 +149,12 @@ export const REPOINT_SPECS: ReadonlyArray<RepointSpec> = [
     file: 'domain/frame-contract.ts',
     packageName: '@nerima-games/mc-kernel',
     source: 'mc-kernel',
+  },
+  {
+    repository: 'mx-gameplay',
+    file: 'domain/inventory-port.ts',
+    packageName: '@nerima-games/mc-sim',
+    source: 'mc-sim',
   },
   {
     repository: 'mx-ui',
