@@ -252,9 +252,24 @@ pin を書くこと自体は何も壊さないが、**次の** `pnpm sync` が�
 | ゲート | 読むもの | 問い |
 | --- | --- | --- |
 | `pnpm check:mirrors` (mc-dev-meta) | `repos/` | **pin された 2 つのリビジョンは一致しているか** |
+| `pnpm check:repoint` (mc-dev-meta) | `repos/` + 使い捨てコピー | **ミラーを消して import を張り替えたら、本当にコンパイルが通るか** |
 | `pnpm check:roster` (mc-compose) | 隣接する作業コピー | **手書きの転記は、いま見ているコードと一致しているか** |
 
 **この分割は事故ではない。**
+
+`check:repoint` は `check:mirrors` と同じ `repos/` を読み、同じ provenance ブロックを印字する
+(`scripts/repos-provenance.ts` を共有している。転記された provenance レポートが 2 つある状態は、
+このリポジトリが高くつくようにするために存在する当のものである)。
+違うのは問いのほうで、`check:mirrors` が**形**を比べるのに対し `check:repoint` は**コンパイラを走らせる**。
+形の一致は張り替えが通るための必要条件であって十分条件ではない —
+モジュール解決・`exports` マップ・`types` フィールド・バレルの再 export 形状、
+そして「宣言箇所では無害な差異が消費箇所では致命的になる」ことのどれもが、差分がきれいなまま張り替えを壊しうる。
+実際、最初に走らせた時点で 3 リポジトリすべてが落ちた([testing.md](./testing.md) §6.1)。
+
+**張り替えは `repos/` の外の使い捨てコピーに対して行う。**
+`repos/` は gitignore されているので、そこへの書き込みは `git status` に出ない。
+そして `repos/` は `check:mirrors` が読む当のファイルである —
+あるゲートが別のゲートの入力を黙って書き換えるのは、最も高くつく種類の誤答になる。
 
 `check:mirrors` が答えるのは合成状態についての問いであり、
 それは **mc-dev-meta のこのコミットの性質**である

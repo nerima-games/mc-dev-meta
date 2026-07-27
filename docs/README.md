@@ -62,6 +62,8 @@
 | `pnpm update:manifest:latest:dry` | 同上。何も書かない |
 | `pnpm check:workspace` | clone 済みの各リポジトリで `pnpm verify` |
 | `pnpm check:workspace typecheck` | 別のスクリプトを指定して横断実行 |
+| `pnpm check:mirrors` | 手書きミラーと元リポジトリの**形**を突き合わせる。`verify` に入っている |
+| `pnpm check:repoint` | ミラーを実際に消して import を張り替え、**`tsc` を走らせる**。`verify` には入っていない([testing.md](./testing.md) §6.1) |
 | `pnpm verify` | **このリポジトリ自身**の検査。空の `repos/` でも通る |
 
 ## 4. 絶対規則

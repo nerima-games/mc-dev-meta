@@ -89,10 +89,8 @@
  * `MIRROR_SOURCE_NOTE` in domain/mirror-contract.ts for why the split with
  * mc-compose's `pnpm check:roster` is deliberate rather than accidental.
  */
-import { execFile } from 'node:child_process'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import {
   compareMirror,
@@ -106,20 +104,12 @@ import {
   type MirrorObservation,
   type MirrorOutcome,
   type MirrorSpec,
-  type RepositoryProvenance,
   type SampleVerdict,
   type SourceObservation,
   type ValueObservation,
 } from '../domain/mirror-contract'
-import {
-  describeManifestError,
-  entryNamed,
-  isPinned,
-  parseManifest,
-  type Manifest,
-} from '../domain/manifest'
-import { isDestructiveGitCommand } from '../domain/sync-plan'
-import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../domain/workspace'
+import { loadManifest, provenanceOf } from './repos-provenance'
+import { REPOS_DIRECTORY } from '../domain/workspace'
 import {
   declaredTypes,
   describeShapeError,
@@ -127,8 +117,6 @@ import {
   typesInApiLock,
   type TypeShape,
 } from '../domain/type-shape'
-
-const execFileAsync = promisify(execFile)
 
 const rootDir = process.cwd()
 
@@ -165,72 +153,6 @@ const presentDirectories = async (): Promise<ReadonlySet<string>> => {
       : entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
   )
 }
-
-// ---------------------------------------------------------------------------
-// What was on disk when this ran
-// ---------------------------------------------------------------------------
-
-/**
- * Read-only git, sharing the destructive-argument refusal with the sync side.
- *
- * This gate has no business writing to a working copy, and reusing the guard
- * rather than trusting the two commands below is what keeps that true if
- * somebody later reaches for a third.
- */
-const readGit = async (argv: ReadonlyArray<string>): Promise<string | undefined> => {
-  if (isDestructiveGitCommand(argv)) {
-    return undefined
-  }
-  const result = await execFileAsync('git', [...argv], { cwd: rootDir, encoding: 'utf8' }).catch(
-    () => undefined,
-  )
-  return result?.stdout.trim()
-}
-
-/**
- * What `repos.json` says, or `undefined` if it cannot be read.
- *
- * A missing or unparseable manifest is NOT a failure of this gate — the gate
- * compares mirrors, not manifests, and `pnpm check:workspace` already fails on
- * a broken one. It only costs the provenance report its right-hand column, and
- * the report says so rather than pretending everything matched.
- */
-const loadManifest = async (): Promise<Manifest | undefined> => {
-  const raw = await readFile(path.join(rootDir, MANIFEST_FILENAME), 'utf8').catch(() => undefined)
-  if (raw === undefined) {
-    return undefined
-  }
-  const parsed = parseManifest(raw)
-  if (!parsed.ok) {
-    console.error(`check:mirrors: could not read pins from ${MANIFEST_FILENAME}: ${describeManifestError(parsed.error)}`)
-    return undefined
-  }
-  return parsed.value
-}
-
-const provenanceOf = async (
-  names: ReadonlyArray<string>,
-  manifest: Manifest | undefined,
-): Promise<ReadonlyArray<RepositoryProvenance>> =>
-  await names.reduce<Promise<ReadonlyArray<RepositoryProvenance>>>(async (accumulated, name) => {
-    const previous = await accumulated
-    const directory = path.join(REPOS_DIRECTORY, name)
-    const head = await readGit(['-C', directory, 'rev-parse', 'HEAD'])
-    const status = await readGit(['-C', directory, 'status', '--porcelain'])
-    const entry = manifest === undefined ? undefined : entryNamed(manifest, name)
-
-    return [
-      ...previous,
-      {
-        name,
-        head,
-        pinned: entry !== undefined && isPinned(entry.ref) ? entry.ref : undefined,
-        // Unreadable status reads as dirty, the same fail-closed default the
-        // sync side uses: "cannot tell" and "no local edits" must not look alike.
-        dirty: status === undefined || status.length > 0,
-      },
-    ]
-  }, Promise.resolve([]))
 
 // ---------------------------------------------------------------------------
 // Importing
@@ -499,10 +421,11 @@ export const main = async (): Promise<number> => {
   // — a mirror that cannot be imported, say — has still said what it was
   // looking at. The report below repeats the source note for the same reason.
   const provenance = await provenanceOf(
+    rootDir,
     [...new Set(MIRROR_SPECS.flatMap((spec) => [spec.repository, spec.source]))]
       .filter((name) => present.has(name))
       .sort(),
-    await loadManifest(),
+    await loadManifest(rootDir, 'check:mirrors'),
   )
   for (const line of describeProvenance(provenance)) {
     console.log(line)

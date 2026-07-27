@@ -38,6 +38,7 @@
     "check:workspace": "tsx scripts/check-workspace.ts",
     "check:api-window": "tsx scripts/check-api-lock-window.ts",
     "check:mirrors": "tsx scripts/check-mirrors.ts",
+    "check:repoint": "tsx scripts/check-repoint.ts",
     "typecheck": "tsc -p tsconfig.build.json --pretty false && tsc -p tsconfig.test.json --pretty false",
     "lint": "oxlint --deny-warnings index.ts domain scripts test",
     "lint:fix": "oxlint --fix index.ts domain scripts test",
