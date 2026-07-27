@@ -13,7 +13,7 @@
 <!-- ------------------------------------------------------------------------- -->
 
 format: 1
-exported declarations: 56
+exported declarations: 66
 supporting declarations: 0
 
 ## Exported
@@ -155,6 +155,63 @@ type Parsed<A> = {
 };
 ```
 
+### PinDecision  `type`
+
+```ts
+type PinDecision = {
+    readonly _tag: 'LeaveAbsent';
+    readonly name: string;
+    readonly ref: string;
+} | {
+    readonly _tag: 'LeaveDirty';
+    readonly name: string;
+} | {
+    readonly _tag: 'LeaveRemoteUnknown';
+    readonly name: string;
+} | {
+    readonly _tag: 'LeaveDiverged';
+    readonly name: string;
+    readonly head: string;
+    readonly tip: string;
+} | {
+    readonly _tag: 'AlreadyPinned';
+    readonly name: string;
+    readonly ref: string;
+} | {
+    readonly _tag: 'Pin';
+    readonly name: string;
+    readonly ref: string;
+    readonly source: 'working-copy' | 'remote';
+};
+```
+
+### PinObservation  `type`
+
+```ts
+type PinObservation = {
+    readonly _tag: 'Absent';
+} | {
+    readonly _tag: 'Dirty';
+} | {
+    readonly _tag: 'Clean';
+    readonly head: string;
+    readonly remote: RemoteObservation | undefined;
+};
+```
+
+### PinSummary  `type`
+
+```ts
+type PinSummary = {
+    readonly pinned: ReadonlyArray<string>;
+    readonly alreadyPinned: ReadonlyArray<string>;
+    readonly skippedAbsent: ReadonlyArray<string>;
+    readonly skippedDirty: ReadonlyArray<string>;
+    readonly skippedDiverged: ReadonlyArray<string>;
+    readonly skippedRemoteUnknown: ReadonlyArray<string>;
+};
+```
+
 ### REPOSITORIES  `const`
 
 ```ts
@@ -171,6 +228,21 @@ const REPOSITORY_NAMES: ReadonlyArray<string>;
 
 ```ts
 const REPOS_DIRECTORY = "repos";
+```
+
+### RefSource  `type`
+
+```ts
+type RefSource = 'manifest' | 'remote';
+```
+
+### RemoteObservation  `type`
+
+```ts
+type RemoteObservation = {
+    readonly tip: string;
+    readonly headIsAncestorOfTip: boolean;
+};
 ```
 
 ### RepositoryEntry  `type`
@@ -202,22 +274,35 @@ type SyncAction = {
 } | {
     readonly _tag: 'Fetch';
     readonly name: string;
-    readonly reason: 'ref-not-local' | 'unpinned';
+    readonly reason: 'ref-not-local' | 'unpinned' | 'latest';
 } | {
     readonly _tag: 'Checkout';
     readonly name: string;
     readonly ref: string;
+    readonly source: RefSource;
 } | {
     readonly _tag: 'AlreadyAtRef';
     readonly name: string;
     readonly ref: string;
+    readonly source: RefSource;
 } | {
     readonly _tag: 'UpToDate';
     readonly name: string;
 } | {
     readonly _tag: 'SkipDirty';
     readonly name: string;
+} | {
+    readonly _tag: 'SkipDiverged';
+    readonly name: string;
+    readonly head: string;
+    readonly tip: string;
 };
+```
+
+### SyncMode  `type`
+
+```ts
+type SyncMode = 'pinned' | 'latest';
 ```
 
 ### SyncSummary  `type`
@@ -229,6 +314,7 @@ type SyncSummary = {
     readonly checkedOut: ReadonlyArray<string>;
     readonly unchanged: ReadonlyArray<string>;
     readonly skippedDirty: ReadonlyArray<string>;
+    readonly skippedDiverged: ReadonlyArray<string>;
 };
 ```
 
@@ -261,6 +347,7 @@ type WorkingCopyState = {
     readonly dirty: boolean;
     readonly hasPinnedRef: boolean;
     readonly fetchedThisRun: boolean;
+    readonly remote: RemoteObservation | undefined;
 };
 ```
 
@@ -285,7 +372,7 @@ type WorkspaceStatus = 'empty' | 'partial' | 'complete';
 ### applyAction  `const`
 
 ```ts
-const applyAction: (entry: ManifestEntry, state: WorkingCopyState, action: SyncAction) => WorkingCopyState;
+const applyAction: (entry: ManifestEntry, state: WorkingCopyState, action: SyncAction, remote?: RemoteObservation | undefined) => WorkingCopyState;
 ```
 
 ### buildOrder  `const`
@@ -310,6 +397,12 @@ const describeAction: (action: SyncAction) => string;
 
 ```ts
 const describeManifestError: (error: ManifestError) => string;
+```
+
+### describePinDecision  `const`
+
+```ts
+const describePinDecision: (decision: PinDecision) => string;
 ```
 
 ### describeWorkspaceRun  `const`
@@ -387,19 +480,31 @@ const parseManifest: (raw: string) => Parsed<Manifest>;
 ### planAll  `const`
 
 ```ts
-const planAll: (entries: ReadonlyArray<ManifestEntry>, observe: (entry: ManifestEntry) => WorkingCopyState) => ReadonlyArray<SyncAction>;
+const planAll: (entries: ReadonlyArray<ManifestEntry>, observe: (entry: ManifestEntry) => WorkingCopyState, mode?: SyncMode) => ReadonlyArray<SyncAction>;
+```
+
+### planPin  `const`
+
+```ts
+const planPin: (entry: ManifestEntry, observation: PinObservation, mode?: SyncMode) => PinDecision;
 ```
 
 ### planSync  `const`
 
 ```ts
-const planSync: (entry: ManifestEntry, state: WorkingCopyState) => SyncAction;
+const planSync: (entry: ManifestEntry, state: WorkingCopyState, mode?: SyncMode) => SyncAction;
 ```
 
 ### planWorkspaceRun  `const`
 
 ```ts
 const planWorkspaceRun: (manifest: Manifest, presentDirectories: ReadonlyArray<string>) => WorkspaceRunPlan;
+```
+
+### refToWrite  `const`
+
+```ts
+const refToWrite: (decision: PinDecision) => string | undefined;
 ```
 
 ### repositoriesInTier  `const`
@@ -429,7 +534,7 @@ const serialiseManifest: (manifest: Manifest) => string;
 ### settle  `const`
 
 ```ts
-const settle: (entry: ManifestEntry, from: WorkingCopyState, maxRounds?: number) => {
+const settle: (entry: ManifestEntry, from: WorkingCopyState, maxRounds?: number, mode?: SyncMode, remote?: RemoteObservation | undefined) => {
     readonly actions: ReadonlyArray<SyncAction>;
     readonly state: WorkingCopyState;
 };
@@ -439,6 +544,12 @@ const settle: (entry: ManifestEntry, from: WorkingCopyState, maxRounds?: number)
 
 ```ts
 const summarise: (actions: ReadonlyArray<SyncAction>) => SyncSummary;
+```
+
+### summarisePins  `const`
+
+```ts
+const summarisePins: (decisions: ReadonlyArray<PinDecision>) => PinSummary;
 ```
 
 ### unpinnedEntries  `const`

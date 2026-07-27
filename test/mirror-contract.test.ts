@@ -19,9 +19,12 @@ import {
   DECLARED_DIVERGENCES,
   describeMirrorFinding,
   describeMirrorRun,
+  describeProvenance,
   failingOutcomes,
   fingerprintFinding,
+  isOffPin,
   KNOWN_FINDINGS,
+  MIRROR_SOURCE_NOTE,
   MIRROR_SPECS,
   mirrorRunExitCode,
   REFINEMENT_SAMPLES,
@@ -32,6 +35,7 @@ import {
   type MirrorObservation,
   type MirrorOutcome,
   type MirrorSpec,
+  type RepositoryProvenance,
   type SourceObservation,
   type ValueObservation,
 } from '../domain/mirror-contract'
@@ -644,5 +648,78 @@ describe('the report as a whole', () => {
 
     expect(report).toContain('Neither repository can see this on its own')
     expect(report).toContain('DECLARED_DIVERGENCES')
+  })
+})
+
+describe('which checkout this gate read', () => {
+  const PIN = 'a'.repeat(40)
+  const OTHER = 'b'.repeat(40)
+
+  const row = (overrides: Partial<RepositoryProvenance> = {}): RepositoryProvenance => ({
+    name: 'mx-gameplay',
+    head: PIN,
+    pinned: PIN,
+    dirty: false,
+    ...overrides,
+  })
+
+  it('counts a repository sitting on its pin as on-pin', () => {
+    expect(isOffPin(row())).toBe(false)
+  })
+
+  it('counts every way of not being the pin', () => {
+    expect(isOffPin(row({ head: OTHER })), 'different revision').toBe(true)
+    expect(isOffPin(row({ dirty: true })), 'dirty').toBe(true)
+    expect(isOffPin(row({ head: undefined })), 'unreadable HEAD').toBe(true)
+    expect(isOffPin(row({ pinned: undefined })), 'unpinned entry').toBe(true)
+  })
+
+  // REGRESSION — THE DIAGNOSIS THIS COST. This gate reads `repos/`; mc-compose's
+  // `pnpm check:roster` reads the sibling working copies. Both are right for the
+  // question each asks, and the split is written down in MIRROR_SOURCE_NOTE. What
+  // was not defensible was that a failure named neither, so a finding against a
+  // pin that could not advance read as real drift in the mirror.
+  it('names the checkout it read, on a passing run', () => {
+    const report = describeProvenance([row()]).join('\n')
+    expect(report).toContain('repos/')
+    expect(report).toContain('check:roster')
+    expect(report).toContain('1 of 1 repositories are at the revision repos.json pins')
+  })
+
+  it('names the checkout it read, in the failure block too', () => {
+    const failing = compareMirror(
+      spec,
+      { ...agreeingMirror, capabilities: [capability(['0 (air)'], AGREED_IDS)] },
+      agreeingSource,
+      [],
+    )
+    const report = describeMirrorRun([failing]).join('\n')
+    for (const line of MIRROR_SOURCE_NOTE) {
+      expect(report).toContain(line)
+    }
+  })
+
+  it('lists every repository that is not at its pin, with both revisions', () => {
+    const report = describeProvenance([
+      row(),
+      row({ name: 'mc-render', head: OTHER }),
+    ]).join('\n')
+
+    expect(report).toContain('1 of 2 repositories are at the revision repos.json pins')
+    expect(report).toContain('1 are NOT')
+    expect(report).toContain(`mc-render  disk ${OTHER.slice(0, 12)}  pinned ${PIN.slice(0, 12)}`)
+    expect(report).toContain('pnpm sync')
+  })
+
+  it('says a dirty working copy is not any revision at all', () => {
+    expect(describeProvenance([row({ dirty: true })]).join('\n')).toContain(
+      'uncommitted changes',
+    )
+  })
+
+  it('still names the source when nothing could be read', () => {
+    const report = describeProvenance([]).join('\n')
+    expect(report).toContain('repos/')
+    expect(report).toContain('No repository under repos/ could be read')
   })
 })

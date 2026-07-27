@@ -42,9 +42,35 @@
  * `test/sync-plan.test.ts` against `applyAction`, which models what this script
  * does. If the two ever diverge, THIS FILE is what is wrong.
  *
+ * ---------------------------------------------------------------------------
+ * `--latest`, and the deadlock it exists to break
+ * ---------------------------------------------------------------------------
+ *
+ * Without it, this script and `pnpm update:manifest` form a closed loop: sync
+ * writes `repos/ <- pin`, update:manifest writes `pin <- repos/ HEAD`, and the
+ * pin can therefore only ever move if somebody commits INSIDE `repos/` — which
+ * is gitignored and which this design tells people not to treat as a working
+ * copy. Six repositories were pushed to; both commands reported success; the
+ * pin did not move; `pnpm check:mirrors`, which reads `repos/`, spent a
+ * diagnosis reporting drift against a snapshot that could not advance.
+ *
+ * `--latest` fetches and advances each working copy to `origin`'s tip. Both
+ * refusals survive it intact, and one is added:
+ *
+ *   - DIRTY is skipped, as always.
+ *   - DIVERGED is skipped: if HEAD is not reachable from the tip, moving would
+ *     strand a commit that exists in this clone and nowhere else, because sync
+ *     leaves working copies detached. See `SkipDiverged` in domain/sync-plan.ts.
+ *
+ * `--latest` never advances the PIN. That is `pnpm update:manifest`, still, and
+ * deliberately: the two halves stay separable so that "move my disk" and
+ * "record it in a commit" remain two reviewable decisions.
+ *
  * Usage:
  *   pnpm sync              clone/fetch/checkout per repos.json
  *   pnpm sync:dry          print the plan, touch nothing
+ *   pnpm sync:latest       fetch, then fast-forward each copy to origin's tip
+ *   pnpm sync:latest:dry   print that plan, touch nothing
  */
 import { execFile } from 'node:child_process'
 import { readFile, stat } from 'node:fs/promises'
@@ -67,7 +93,9 @@ import {
   isNoOp,
   planSync,
   summarise,
+  type RemoteObservation,
   type SyncAction,
+  type SyncMode,
   type WorkingCopyState,
 } from '../domain/sync-plan'
 import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../domain/workspace'
@@ -79,16 +107,37 @@ const rootDir = process.cwd()
 const isDryRun = process.argv.includes('--dry-run')
 
 /**
- * At most two rounds of work are ever needed (fetch, then checkout), plus the
- * round that observes there is nothing left; 3 is the loop guard.
+ * `--latest` rather than `--update` or `--remote`.
+ *
+ * `--update` is what somebody would reasonably expect to update `repos.json`,
+ * which this command must not do. `--remote` names a place rather than an
+ * outcome, and this tool already talks to the remote in the default mode — the
+ * new thing is not the network, it is WHICH REVISION wins. `--latest` says that
+ * in one word, and it says nothing that could be read as "force" or "discard",
+ * which is the register the rest of this script is written in.
+ */
+const mode: SyncMode = process.argv.includes('--latest') ? 'latest' : 'pinned'
+
+/**
+ * At most two rounds of work are ever needed — fetch (or clone), then checkout
+ * — plus the round that observes there is nothing left. That is three, and the
+ * guard is one above it.
  *
  * It is a guard against a bug in `domain/sync-plan.ts`, NOT the thing that
- * terminates the loop. Every entry — unpinned ones included — reaches a no-op
- * on its own, which is what `test/sync-plan.test.ts` asserts over every entry x
- * every state. If this limit is ever what stops a repository, the planner is
- * wrong and the symptom is wasted network round-trips.
+ * terminates the loop. Every entry, in either mode, reaches a no-op on its own,
+ * which is what `test/sync-plan.test.ts` asserts over every entry x every state
+ * x both modes. If this limit is ever what stops a repository, the planner is
+ * wrong.
+ *
+ * It is 4 rather than 3 because `--latest` on an ABSENT repository uses all
+ * three: clone (which lands on the manifest's pin), advance to the tip, observe.
+ * A guard set exactly at the worst legitimate case cannot tell "converged" from
+ * "gave up" — the loop would simply stop, having left the working copy at the
+ * pin, and report the last action as though it were the settled one. Silence is
+ * the failure mode this whole change exists to remove; the spare round costs a
+ * `git status` on the rare path and buys a loop that visibly does not need it.
  */
-const MAX_ROUNDS = 3
+const MAX_ROUNDS = 4
 
 type GitResult = { readonly ok: true; readonly stdout: string } | { readonly ok: false; readonly detail: string }
 
@@ -129,12 +178,47 @@ const directoryExists = async (at: string): Promise<boolean> => {
 }
 
 /**
+ * Read `origin`'s default-branch tip and ask whether HEAD can fast-forward to it.
+ *
+ * `refs/remotes/origin/HEAD` is a purely LOCAL read — it resolves in a clone
+ * nobody has fetched for a month, and would happily report a month-old tip.
+ * That is why the caller only reaches this after a fetch or a clone in this
+ * run; see `RemoteObservation` in domain/sync-plan.ts.
+ *
+ * Everything here fails closed. `merge-base --is-ancestor` exits non-zero both
+ * for "not an ancestor" and for "could not be determined", and `runGit` cannot
+ * tell those apart — so both become `headIsAncestorOfTip: false`, which makes
+ * the repository a `SkipDiverged` rather than a checkout. The alternative
+ * default would move a working copy on the strength of a command that failed.
+ */
+const observeRemote = async (
+  directory: string,
+  head: string,
+): Promise<RemoteObservation | undefined> => {
+  const tip = await runGit(['-C', directory, 'rev-parse', '--verify', 'refs/remotes/origin/HEAD'])
+  if (!tip.ok) {
+    return undefined
+  }
+
+  const resolved = tip.stdout.trim()
+  return {
+    tip: resolved,
+    headIsAncestorOfTip: (
+      await runGit(['-C', directory, 'merge-base', '--is-ancestor', head, resolved])
+    ).ok,
+  }
+}
+
+/**
  * Observe one working copy. Read-only: nothing here writes.
  *
  * `fetchedThisRun` is passed in rather than discovered, because it is not a
  * property of the working copy — nothing on disk records that this process
  * fetched this repository a moment ago. The caller is the only thing that
  * knows, and the loop below is the only scope in which the answer is useful.
+ * `remote` is gated on it for the same reason, and it is not the same reason:
+ * `fetchedThisRun` exists to stop an unpinned entry being fetched twice, while
+ * the gate on `remote` exists to stop `--latest` advancing to a stale tip.
  */
 const observe = async (
   entry: ManifestEntry,
@@ -153,19 +237,32 @@ const observe = async (
   // closed is the only safe default for a check whose whole job is to protect
   // uncommitted work.
   if (!status.ok || !head.ok) {
-    return { _tag: 'Present', head: '', dirty: true, hasPinnedRef: false, fetchedThisRun }
+    return {
+      _tag: 'Present',
+      head: '',
+      dirty: true,
+      hasPinnedRef: false,
+      fetchedThisRun,
+      remote: undefined,
+    }
   }
 
   const hasPinnedRef = isPinned(entry.ref)
     ? (await runGit(['-C', directory, 'cat-file', '-e', `${entry.ref}^{commit}`])).ok
     : false
 
+  const resolvedHead = head.stdout.trim()
+
   return {
     _tag: 'Present',
-    head: head.stdout.trim(),
+    head: resolvedHead,
     dirty: status.stdout.trim().length > 0,
     hasPinnedRef,
     fetchedThisRun,
+    remote:
+      mode === 'latest' && fetchedThisRun
+        ? await observeRemote(directory, resolvedHead)
+        : undefined,
   }
 }
 
@@ -181,7 +278,7 @@ const syncOne = async (entry: ManifestEntry): Promise<RepositoryOutcome> => {
   let state = await observe(entry, false)
 
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
-    const action = planSync(entry, state)
+    const action = planSync(entry, state, mode)
     actions.push(action)
     console.log(`  ${describeAction(action)}`)
 
@@ -237,10 +334,15 @@ export const main = async (): Promise<number> => {
     return 1
   }
 
+  const target =
+    mode === 'latest'
+      ? "origin's tip (--latest: repos.json is READ for the clone URLs only, and is NOT updated)"
+      : 'the revisions pinned in repos.json'
+
   console.log(
     isDryRun
-      ? `sync (--dry-run): planning ${String(manifest.repositories.length)} repositories into ${REPOS_DIRECTORY}/ — NOTHING will be modified.`
-      : `sync: ${String(manifest.repositories.length)} repositories into ${REPOS_DIRECTORY}/`,
+      ? `sync (--dry-run): planning ${String(manifest.repositories.length)} repositories into ${REPOS_DIRECTORY}/ against ${target} — NOTHING will be modified.`
+      : `sync: ${String(manifest.repositories.length)} repositories into ${REPOS_DIRECTORY}/, at ${target}.`,
   )
   console.log('')
 
@@ -265,13 +367,37 @@ export const main = async (): Promise<number> => {
       `fetched ${String(summary.fetched.length)}, ` +
       `checked out ${String(summary.checkedOut.length)}, ` +
       `unchanged ${String(summary.unchanged.length)}, ` +
-      `skipped (dirty) ${String(summary.skippedDirty.length)}.`,
+      `skipped (dirty) ${String(summary.skippedDirty.length)}, ` +
+      `skipped (diverged) ${String(summary.skippedDiverged.length)}.`,
   )
 
   if (summary.skippedDirty.length > 0) {
     console.log('')
     console.log(`NOT synced because they have uncommitted changes: ${summary.skippedDirty.join(', ')}.`)
     console.log('Nothing in them was touched. Commit or stash, then re-run `pnpm sync`.')
+  }
+
+  if (summary.skippedDiverged.length > 0) {
+    console.log('')
+    console.log(
+      `NOT advanced because their HEAD is not reachable from origin's tip: ${summary.skippedDiverged.join(', ')}.`,
+    )
+    console.log(
+      'Nothing in them was touched. These working copies are detached, so a commit made in one is ' +
+        'reachable from HEAD and nothing else; moving HEAD would leave it in the reflog and nowhere ' +
+        'a person would look. Push it, or check out the tip yourself if you meant to abandon it.',
+    )
+  }
+
+  // The default mode cannot make the pin move — that is the deadlock this
+  // flag exists to break — so the reminder belongs on the run that CAN.
+  if (mode === 'latest' && !isDryRun && summary.checkedOut.length > 0) {
+    console.log('')
+    console.log(
+      `${String(summary.checkedOut.length)} working copy/ies now sit AHEAD of repos.json. Until you run ` +
+        '`pnpm update:manifest` and commit the result, the composite state on this machine is not ' +
+        'recorded anywhere and `pnpm check:mirrors` is comparing revisions the manifest does not name.',
+    )
   }
 
   if (failures.length > 0) {

@@ -73,11 +73,33 @@ E2E が最後に通ったとき 15 リポジトリのどのコミットが check
 
 ## 3. マニフェストを更新する
 
+`repos/` を動かすのは `pnpm sync`、`repos.json` を書くのは `pnpm update:manifest` である。
+この 2 つだけでは **pin は決して進まない**(理由は §5)。
+remote の先端を取りに行くのが `--latest` であり、どちらの側に付けてもよい。
+
 ```console
-$ pnpm update:manifest        # clone 済み・clean なリポジトリを現在の HEAD に pin
-$ pnpm update:manifest:dry    # 差分が出るかだけ確認
+$ # 手元優先 — 作業コピーを先に進め、それを記録する
+$ pnpm sync --latest          # 各リポジトリを origin の先端へ fast-forward
+$ pnpm update:manifest        # その HEAD を pin
 $ git add repos.json && git commit
+
+$ # pin 優先 — 先に pin を進め、あとから作業コピーを合わせる
+$ pnpm update:manifest --latest   # origin の先端を pin(repos/ は動かさない)
+$ pnpm sync                       # repos/ をその pin へ
 ```
+
+| コマンド | 何を読み | 何を書くか |
+| --- | --- | --- |
+| `pnpm sync` | `repos.json` | `repos/` |
+| `pnpm sync --latest` | **origin** | `repos/` |
+| `pnpm update:manifest` | `repos/` の HEAD | `repos.json` |
+| `pnpm update:manifest --latest` | **origin** | `repos.json` |
+| `*:dry` / `--dry-run` | 同上 | **何も書かない** |
+
+`pnpm sync:latest:dry` が出せるのは「fetch する」までである。
+先端がどこかは fetch するまで分からないので、
+**触らずに** 全計画を出すことは原理的にできない。これは `--dry-run` の契約が正しく、
+表示が不完全なほうを選んだ結果である。
 
 ### 3.1 このツールが**書かないもの**
 
@@ -86,8 +108,22 @@ $ git add repos.json && git commit
 | clone されていない | ref をそのまま残す | 存在しないものについて意見を持たない |
 | **未コミットの変更がある** | **pin しない** | dirty な木の HEAD は手元の状態を記述していない。pin すると**誰も再現できない状態を pin 済みの見た目で**記録することになる |
 | 既に同じ SHA | 何もしない | |
+| `--latest` で **HEAD が先端から辿れない** | **pin しない** | pin を書くこと自体は何も壊さない。壊すのは**次の** `pnpm sync` である。作業コピーは detached なので、そのコミットはどこからも参照されなくなる。**後で暴発する仕掛けを置くほうが、いま壊すより悪い** |
+| `--latest` で **remote が読めなかった** | **pin しない** | 手元の HEAD にフォールバックすると、`--latest` が黙って素の挙動になる。訊かれたのと別の問いに答えて成功を報告するフラグは、無いほうがましである |
 
-### 3.2 差分は 1 行になる
+### 3.2 「already up to date」が何を言っていなかったか
+
+素の `pnpm update:manifest` が何も書かなかったとき、
+それが意味するのは **「`repos/` と pin が一致している」** だけである。
+`pnpm sync` は `repos/` を pin **に** 置くのだから、一致は**正常な状態**であって、
+GitHub 側がどうなっているかについては一言も述べていない。
+
+この 2 つを取り違えたのが §5 の事故なので、メッセージがそう言うようになっている:
+
+> update:manifest: repos.json already matches every working copy under repos/.
+> That is not the same as "the pins are current" — no remote was contacted.
+
+### 3.3 差分は 1 行になる
 
 `serialiseManifest` は 2 スペースインデント + 末尾改行という固定の形で書く。
 1 リポジトリを pin したときの差分が**1 行**になるようにするためである
@@ -118,6 +154,12 @@ $ git add repos.json && git commit
 `git checkout <branch>` は clean な木に対してでも「開発者がいたブランチ」を動かすが、
 `--detach` はローカルブランチを作りも動かしもしない。
 
+この 3 重の強制は `--latest` でもそのままである。
+`--latest` は**別コマンドではなくモード**であり、同じ planner・同じアクション集合・
+同じ網羅テストを通る。`test/sync-plan.test.ts` の破壊的引数スイープは
+**全状態 × 全エントリ × 両モード**を回る
+(モード軸を足す前は、`--latest` の checkout に `--force` を入れても**素通りした**)。
+
 ### 4.1 dirty なリポジトリ
 
 **スキップする。エラーにしない。黙らない。**
@@ -141,7 +183,110 @@ $ git add repos.json && git commit
 計画 → 適用 → 再計画、で 2 回目が no-op になること。
 **スクリプトがこのモデルから外れたら、間違っているのはスクリプトのほうである。**
 
-## 5. 想定される質問
+## 5. pin が動かなかった話 — 閉じたループ
+
+### 5.1 何が起きたか
+
+`pnpm sync` は `repos/ <- pin` を書き、`pnpm update:manifest` は `pin <- repos/ HEAD` を書く。
+**ループが閉じている。** どちらも、相手が直前に書いたリビジョン以外を名指すことができない。
+pin が進むのは `repos/` の中で誰かがコミットしたときだけであり、
+`repos/` は gitignore されていて、作業コピーとして扱うなとこの設計自身が言っている。
+
+6 リポジトリに push した直後の実測:
+
+```
+mx-gameplay remote HEAD:  50395a480f2a907b1b3e1dbef8a47a3d3721f31f
+repos.json pin:           523617676c7d393143f0b3f78bce28955b7671ba
+repos/mx-gameplay HEAD:   523617676c7d393143f0b3f78bce28955b7671ba
+
+$ pnpm sync             -> "cloned 0, fetched 0, checked out 0, unchanged 15"
+$ pnpm update:manifest  -> "repos.json is already up to date."
+```
+
+`fetched 0` に注目。**sync は remote に接続すらしていない。**
+`planSync` は `state.head === entry.ref` を見た時点で `AlreadyAtRef` を返し、
+remote に触れうる分岐に到達しないからである。
+
+### 5.2 なぜこれが最悪の失敗様式なのか
+
+2 つのコマンドが、**どちらも成功を報告し、どちらも何もしていない**。
+pin 留めツールにとってこれ以上悪い壊れ方はない — 失敗するツールは直されるが、
+黙って何もしないツールは信頼されたまま放置される。
+
+実害も出た。`pnpm check:mirrors` は `repos/` を読む。
+つまりこの組織の 3 つある横断ゲートの 1 つが、
+**進みようのないスナップショット**と比較し続けていた。
+実際に、作業コピーが `mx-gameplay/domain/chunk-store-port.ts:347` で
+export しているものを「mirror に無い」と報告した。これは drift に見え、診断を 1 つ消費した。
+逆向きはもっと悪い — pin 以降に本当に drift した mirror を **OK と報告する**。
+
+### 5.3 `--latest`
+
+`sync` と `update:manifest` の両方に付く。remote に訊いて、その先端を採る。
+これが、どちらの半分にも「相手が書いたのではないリビジョン」を与える唯一の経路である。
+
+`--update` ではないのは、それが `repos.json` を更新すると読めるからで、
+`pnpm sync` はそれをしてはならない。`--remote` ではないのは、
+それが**場所**であって**結果**ではないからで、素のモードも既に remote には接続する
+(新しいのは接続ではなく、**どのリビジョンが勝つか**である)。
+
+### 5.4 先端へ進めるときに失われないための 2 つの規則
+
+1. **dirty はスキップ。** 素のモードと完全に同じ。
+2. **fast-forward のみ。** HEAD が先端から辿れないなら `SkipDiverged` として
+   スキップし、名前を出す。`pnpm sync` は作業コピーを **detached** のままにするので、
+   そこで作られたコミットは **HEAD からしか辿れない**。
+   先端を checkout すれば reflog にしか残らず、それは失われたのと同じである。
+
+規則 2 は意図的に**保守的**である。先端の系譜から外れた pin
+(側枝に打たれた pin など、実際には何も失われない場合)も拒否する。
+外から見ればどちらも「HEAD が先端から辿れない」でしかなく、
+取りうる 2 つの誤りのうち、**動かさない誤りのほうが取り消せる**。
+
+`pnpm update:manifest --latest` も同じ述語を使う。
+pin を書くこと自体は何も壊さないが、**次の** `pnpm sync` がそれに従って checkout する。
+ローカルコミットを飛び越えた pin は、後で暴発する仕掛けである。
+
+### 5.5 横断ゲートが 2 つ、読む checkout が別々なのはなぜか
+
+| ゲート | 読むもの | 問い |
+| --- | --- | --- |
+| `pnpm check:mirrors` (mc-dev-meta) | `repos/` | **pin された 2 つのリビジョンは一致しているか** |
+| `pnpm check:roster` (mc-compose) | 隣接する作業コピー | **手書きの転記は、いま見ているコードと一致しているか** |
+
+**この分割は事故ではない。**
+
+`check:mirrors` が答えるのは合成状態についての問いであり、
+それは **mc-dev-meta のこのコミットの性質**である
+(他のどのリポジトリのコミットの性質でもない。両方を見られるのがここだけだから)。
+作業コピーを読んだら、答えは「たまたま checkout されていたもの」の性質になり、
+それこそ `repos.json` が答えでなくすために存在するものである。
+
+`check:roster` が答えるのは、mc-compose 内にコミットされた**手書きの転記**が
+`file:line` まで含めて元と一致しているかである。
+その転記は作業コピーを見ながら編集されるので、
+照合先も作業コピーでなければならない。実際、この 2 つは乖離する —
+初めて両方に対して走らせたとき `mc-dev-meta/repos` は
+`mc-render/stages/registration.ts` について 17 行遅れていた。
+
+**弁護できなかったのは、それがどこにも書かれていなかったことである。**
+失敗メッセージがどちらの checkout を読んだのか言わなかったので、
+進めない pin に対する所見が、mirror の本物の drift として読めてしまった。
+いまは通っても落ちても毎回、読んだ checkout とそのリビジョンを出す:
+
+```
+Source: repos/ — the checkout this repository pins in repos.json, NOT the sibling working
+copies next to it. mc-compose's `pnpm check:roster` reads those instead, deliberately; ...
+9 of 9 repositories are at the revision repos.json pins.
+```
+
+pin から外れているものがあれば、**disk 側と pin 側の両方の SHA を並べて**名指す。
+pin から外れていること自体は失敗ではない
+(`pnpm sync --latest` の目的の半分はその状態を意図的に作ることである)。
+報告されるのは、**マニフェストが名指していないリビジョンに対する所見**を読む人が、
+mirror の中に drift を探しに行く前にそれを知る必要があるからである。
+
+## 6. 想定される質問
 
 **Q. git submodule でいいのでは?**
 

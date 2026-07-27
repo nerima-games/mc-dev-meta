@@ -54,8 +54,12 @@
 | --- | --- |
 | `pnpm sync` | `repos.json` に従って 15 リポジトリを clone / fetch / checkout |
 | `pnpm sync:dry` | 計画だけ表示。何も触らない |
+| `pnpm sync:latest` | **origin の先端へ fast-forward。** dirty と diverged はスキップ |
+| `pnpm sync:latest:dry` | 同上の計画。fetch する手前まで表示 |
 | `pnpm update:manifest` | clone 済み・clean なリポジトリを現在の HEAD に pin |
 | `pnpm update:manifest:dry` | 差分が出るかだけ確認 |
+| `pnpm update:manifest:latest` | **origin の先端を pin。** `repos/` は動かさない |
+| `pnpm update:manifest:latest:dry` | 同上。何も書かない |
 | `pnpm check:workspace` | clone 済みの各リポジトリで `pnpm verify` |
 | `pnpm check:workspace typecheck` | 別のスクリプトを指定して横断実行 |
 | `pnpm verify` | **このリポジトリ自身**の検査。空の `repos/` でも通る |
@@ -69,6 +73,9 @@
 - 未コミットの変更があるリポジトリは**触らずにスキップ**し、その旨を出力する
 - checkout は必ず `--detach`。ローカルブランチを作りも動かしもしない
 - `repos.json` の ref が `unpinned` のとき **HEAD は絶対に動かさない**
+- `--latest` は **fast-forward のみ**。HEAD が origin の先端から辿れないリポジトリは
+  **触らずにスキップ**する。作業コピーは detached なので、
+  そこで作られたコミットは HEAD からしか辿れないからである
 
 強制の仕組みは [responsibility.md](./responsibility.md) §3、
 検証は [testing.md](./testing.md) §3。

@@ -29,8 +29,12 @@
   "scripts": {
     "sync": "tsx scripts/sync-repos.ts",
     "sync:dry": "tsx scripts/sync-repos.ts --dry-run",
+    "sync:latest": "tsx scripts/sync-repos.ts --latest",
+    "sync:latest:dry": "tsx scripts/sync-repos.ts --latest --dry-run",
     "update:manifest": "tsx scripts/update-manifest.ts",
     "update:manifest:dry": "tsx scripts/update-manifest.ts --dry-run",
+    "update:manifest:latest": "tsx scripts/update-manifest.ts --latest",
+    "update:manifest:latest:dry": "tsx scripts/update-manifest.ts --latest --dry-run",
     "check:workspace": "tsx scripts/check-workspace.ts",
     "check:api-window": "tsx scripts/check-api-lock-window.ts",
     "check:mirrors": "tsx scripts/check-mirrors.ts",

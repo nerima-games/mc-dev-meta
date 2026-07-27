@@ -142,17 +142,54 @@ $ pnpm install
 未コミットの変更があるリポジトリは触らずにスキップし、その旨を出力する。
 [manifest.md](./manifest.md) §3 参照。
 
+### 3.5 GitHub 側の最新に追いつく
+
+`pnpm sync` と `pnpm update:manifest` だけでは、**pin は決して進まない**。
+sync は `repos/ <- pin` を書き、update:manifest は `pin <- repos/ HEAD` を書くので、
+どちらも相手が直前に書いたリビジョンしか名指せない
+(経緯は [manifest.md](./manifest.md) §5)。
+
+remote の先端を取りに行くには `--latest` を使う:
+
+```console
+$ pnpm sync --latest       # 各作業コピーを origin の先端へ fast-forward
+$ pnpm install
+$ pnpm update:manifest     # その HEAD を pin
+$ git add repos.json && git commit
+```
+
+`--latest` も**手元の作業を壊さない**。dirty はスキップし、
+**HEAD が先端から辿れないリポジトリもスキップする** — 作業コピーは detached なので、
+そこで作られたコミットは HEAD からしか辿れず、先端を checkout すれば失われるからである。
+どちらの場合も名前を出して、何も触らずに次へ進む。
+
 ## 4. `pnpm sync` の挙動(要約)
+
+素のモード(`repos.json` の pin へ):
 
 | 状況 | 動作 |
 | --- | --- |
 | `repos/<name>` が無い | **clone**。pin があれば detached checkout |
 | ある / **未コミットの変更あり** | **スキップ。何も触らない。** エラーではない |
-| ある / clean / pin と HEAD が一致 | 何もしない |
+| ある / clean / pin と HEAD が一致 | 何もしない(**remote に接続もしない**) |
 | ある / clean / pin がローカルに無い | **fetch** して再判定 |
 | ある / clean / pin がローカルにある | **detached checkout** |
 | ある / clean / `repos.json` が `unpinned` | **1 回だけ fetch。HEAD は動かさない** |
 | ある / clean / `unpinned` / この run で fetch 済み | 何もしない |
+
+`--latest`(origin の先端へ)。`repos.json` の ref は**一切見ない**:
+
+| 状況 | 動作 |
+| --- | --- |
+| **未コミットの変更あり** | **スキップ。何も触らない。** 素のモードと同じ規則 |
+| この run でまだ remote に訊いていない | **fetch** して再判定 |
+| **HEAD が先端から辿れない** | **スキップ。何も触らない。** ここにしか無いコミットを飛ばさない |
+| HEAD が先端と一致 | 何もしない |
+| それ以外(clean・fast-forward 可能) | 先端へ **detached checkout** |
+
+`unpinned` のエントリも `--latest` では動く。
+素のモードがそれを拒むのは「どこにいるべきか誰も決めていない」からであり、
+`--latest` では**呼び出した人が決めている**ので推測ではない。
 
 `unpinned` の「1 回だけ」は数え方の話ではなく、**1 run あたりの往復回数**の話である。
 pin されたエントリは「ref に着いた」ことで収束できるが、`unpinned` には着くべき ref が無い。

@@ -23,6 +23,9 @@ plan.md §6 Step 0 item 2:
 - 未コミットの変更があるリポジトリは**触らずにスキップ**し、その旨を出力する
 - checkout は必ず `--detach`。ローカルブランチを作りも動かしもしない
 - `repos.json` の ref が `unpinned` のとき **HEAD は絶対に動かさない**
+- `--latest` は **fast-forward のみ**。HEAD が origin の先端から辿れないリポジトリは
+  **触らずにスキップ**する。作業コピーは detached なので、そこで作られたコミットは
+  HEAD からしか辿れず、先端を checkout すれば失われるからである
 
 15 の作業コピーを一度に触るツールは、1 コマンドで午後を丸ごと消せる。
 だから危険な判断はすべて純粋関数(`domain/sync-plan.ts`)にあり、
@@ -62,8 +65,12 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 | --- | --- |
 | `pnpm sync` | `repos.json` に従って 15 リポジトリを clone / fetch / checkout |
 | `pnpm sync:dry` | 計画だけ表示。何も触らない |
+| `pnpm sync:latest` | **origin の先端へ fast-forward。** dirty と diverged はスキップ |
+| `pnpm sync:latest:dry` | 同上の計画。fetch する手前まで表示 |
 | `pnpm update:manifest` | clone 済み・clean なリポジトリを現在の HEAD に pin |
 | `pnpm update:manifest:dry` | 差分が出るかだけ確認 |
+| `pnpm update:manifest:latest` | **origin の先端を pin。** `repos/` は動かさない |
+| `pnpm update:manifest:latest:dry` | 同上。何も書かない |
 | `pnpm check:workspace` | clone 済みの各リポジトリで `pnpm verify` |
 | `pnpm check:workspace <script>` | 別のスクリプトを指定して横断実行 |
 | `pnpm check:api-window` | 各リポジトリの API が何日変わっていないかを報告（plan.md §6 Step 3 の 4 週間） |
@@ -200,6 +207,10 @@ oxlint 0.12 は `no-restricted-syntax` も `no-restricted-properties` も実装�
   埋めるより、存在しないと書いてあるほうがよいため
 - **`pnpm sync` は実リモートに対して検証済み。** 15 件の clone、2 回目以降は no-op。
   以前は未固定エントリが毎回 3 回 fetch していた(45 往復)
+- **pin が進まないデッドロックは解消済み。** sync が `repos/ <- pin` を書き
+  update:manifest が `pin <- repos/ HEAD` を書くのでループが閉じており、
+  6 リポジトリに push しても**両コマンドとも成功を報告して何もしなかった**。
+  `--latest` がこれを破る。詳細は [docs/manifest.md](./docs/manifest.md) §5
 - **ロスターの publish は未実装。** 現在は 16 リポジトリが手作業でミラーしている
 - **changesets 運用は未決**(plan.md §9 の「パッケージ公開先」も未決)
 - **カバレッジ閾値は未設定。** 99% ゲートは完成条件到達時に有効化する

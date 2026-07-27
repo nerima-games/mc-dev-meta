@@ -22,6 +22,12 @@
  */
 
 export * from './domain/manifest'
+// The pin decision — what `pnpm update:manifest` writes and what it refuses to.
+// Exported for the same reason `domain/sync-plan.ts` is: the two are halves of
+// one loop (repos/ <- pin, pin <- repos/), and publishing one half while hiding
+// the other is how the two came to be reasoned about separately in the first
+// place. See docs/manifest.md §5.
+export * from './domain/pin-plan'
 export * from './domain/repository-roster'
 export * from './domain/sync-plan'
 export * from './domain/workspace'

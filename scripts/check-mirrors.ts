@@ -70,13 +70,34 @@
  * disagreement between two pinned revisions IS a property of this commit of
  * mc-dev-meta, and it is not a property of any other repository's commit,
  * because no other repository can see both.
+ *
+ * ---------------------------------------------------------------------------
+ * Which checkout, and why the report has to say so
+ * ---------------------------------------------------------------------------
+ *
+ * That last paragraph is the argument for reading `repos/` rather than the
+ * sibling working copies — and it only holds while `repos/` really is the
+ * pinned composite. For a while it was not, and could not be: `pnpm sync` and
+ * `pnpm update:manifest` formed a closed loop and the pin could not advance
+ * past whatever the other had last written (docs/manifest.md §5). This gate
+ * then reported a mirror as missing an export that the working copy plainly
+ * exported, which read as drift and cost a diagnosis.
+ *
+ * The loop is fixed elsewhere. What is fixed HERE is the half that would have
+ * made it cheap: every run now prints the revisions it read and flags the ones
+ * that are not the pin, and the failure block names the checkout. See
+ * `MIRROR_SOURCE_NOTE` in domain/mirror-contract.ts for why the split with
+ * mc-compose's `pnpm check:roster` is deliberate rather than accidental.
  */
+import { execFile } from 'node:child_process'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import {
   compareMirror,
   describeMirrorRun,
+  describeProvenance,
   mirrorPath,
   mirrorRunExitCode,
   MIRROR_SPECS,
@@ -85,11 +106,20 @@ import {
   type MirrorObservation,
   type MirrorOutcome,
   type MirrorSpec,
+  type RepositoryProvenance,
   type SampleVerdict,
   type SourceObservation,
   type ValueObservation,
 } from '../domain/mirror-contract'
-import { REPOS_DIRECTORY } from '../domain/workspace'
+import {
+  describeManifestError,
+  entryNamed,
+  isPinned,
+  parseManifest,
+  type Manifest,
+} from '../domain/manifest'
+import { isDestructiveGitCommand } from '../domain/sync-plan'
+import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../domain/workspace'
 import {
   declaredTypes,
   describeShapeError,
@@ -97,6 +127,8 @@ import {
   typesInApiLock,
   type TypeShape,
 } from '../domain/type-shape'
+
+const execFileAsync = promisify(execFile)
 
 const rootDir = process.cwd()
 
@@ -133,6 +165,72 @@ const presentDirectories = async (): Promise<ReadonlySet<string>> => {
       : entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
   )
 }
+
+// ---------------------------------------------------------------------------
+// What was on disk when this ran
+// ---------------------------------------------------------------------------
+
+/**
+ * Read-only git, sharing the destructive-argument refusal with the sync side.
+ *
+ * This gate has no business writing to a working copy, and reusing the guard
+ * rather than trusting the two commands below is what keeps that true if
+ * somebody later reaches for a third.
+ */
+const readGit = async (argv: ReadonlyArray<string>): Promise<string | undefined> => {
+  if (isDestructiveGitCommand(argv)) {
+    return undefined
+  }
+  const result = await execFileAsync('git', [...argv], { cwd: rootDir, encoding: 'utf8' }).catch(
+    () => undefined,
+  )
+  return result?.stdout.trim()
+}
+
+/**
+ * What `repos.json` says, or `undefined` if it cannot be read.
+ *
+ * A missing or unparseable manifest is NOT a failure of this gate — the gate
+ * compares mirrors, not manifests, and `pnpm check:workspace` already fails on
+ * a broken one. It only costs the provenance report its right-hand column, and
+ * the report says so rather than pretending everything matched.
+ */
+const loadManifest = async (): Promise<Manifest | undefined> => {
+  const raw = await readFile(path.join(rootDir, MANIFEST_FILENAME), 'utf8').catch(() => undefined)
+  if (raw === undefined) {
+    return undefined
+  }
+  const parsed = parseManifest(raw)
+  if (!parsed.ok) {
+    console.error(`check:mirrors: could not read pins from ${MANIFEST_FILENAME}: ${describeManifestError(parsed.error)}`)
+    return undefined
+  }
+  return parsed.value
+}
+
+const provenanceOf = async (
+  names: ReadonlyArray<string>,
+  manifest: Manifest | undefined,
+): Promise<ReadonlyArray<RepositoryProvenance>> =>
+  await names.reduce<Promise<ReadonlyArray<RepositoryProvenance>>>(async (accumulated, name) => {
+    const previous = await accumulated
+    const directory = path.join(REPOS_DIRECTORY, name)
+    const head = await readGit(['-C', directory, 'rev-parse', 'HEAD'])
+    const status = await readGit(['-C', directory, 'status', '--porcelain'])
+    const entry = manifest === undefined ? undefined : entryNamed(manifest, name)
+
+    return [
+      ...previous,
+      {
+        name,
+        head,
+        pinned: entry !== undefined && isPinned(entry.ref) ? entry.ref : undefined,
+        // Unreadable status reads as dirty, the same fail-closed default the
+        // sync side uses: "cannot tell" and "no local edits" must not look alike.
+        dirty: status === undefined || status.length > 0,
+      },
+    ]
+  }, Promise.resolve([]))
 
 // ---------------------------------------------------------------------------
 // Importing
@@ -396,6 +494,20 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
 
 export const main = async (): Promise<number> => {
   const present = await presentDirectories()
+
+  // Printed BEFORE the comparison, not after, so that a run which then throws
+  // — a mirror that cannot be imported, say — has still said what it was
+  // looking at. The report below repeats the source note for the same reason.
+  const provenance = await provenanceOf(
+    [...new Set(MIRROR_SPECS.flatMap((spec) => [spec.repository, spec.source]))]
+      .filter((name) => present.has(name))
+      .sort(),
+    await loadManifest(),
+  )
+  for (const line of describeProvenance(provenance)) {
+    console.log(line)
+  }
+  console.log('')
 
   // Sequential rather than `Promise.all`: the imports share a module cache and
   // the report has to come out in MIRROR_SPECS order for a diff of two runs to

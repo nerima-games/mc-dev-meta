@@ -973,6 +973,100 @@ export const mirrorRunExitCode = (
 ): number =>
   failingOutcomes(outcomes).length > 0 || staleKnownFindings(outcomes, registry).length > 0 ? 1 : 0
 
+// ---------------------------------------------------------------------------
+// Which checkout was read
+// ---------------------------------------------------------------------------
+
+/**
+ * The one sentence every report begins and ends with.
+ *
+ * There are TWO cross-repository gates in this organisation and they resolve
+ * "the code" differently on purpose:
+ *
+ *   - this one reads `repos/`, the PINNED composite;
+ *   - mc-compose's `pnpm check:roster` reads the sibling working copies.
+ *
+ * The split is defensible because the two gates ask different questions. This
+ * gate asks whether TWO PINNED REVISIONS agree — a property of this commit of
+ * mc-dev-meta, and of no other repository's commit, since no other repository
+ * can see both. Reading working copies would make it a property of whatever
+ * happened to be checked out, which is exactly the thing `repos.json` exists to
+ * stop being the answer. `check:roster` asks whether a HAND-WRITTEN
+ * TRANSCRIPTION, committed inside mc-compose, still matches the source it was
+ * copied from, down to `file:line`; that transcription is edited while looking
+ * at a working copy, so the working copy is what it must be checked against.
+ *
+ * What was NOT defensible was leaving it unsaid. A failure from this gate read
+ * as real drift when the true cause was a pin that could not advance
+ * (docs/manifest.md §5), and nothing in the message named the checkout it had
+ * read. So it is named, every run, pass or fail.
+ */
+export const MIRROR_SOURCE_NOTE: ReadonlyArray<string> = [
+  'Source: repos/ — the checkout this repository pins in repos.json, NOT the sibling working',
+  "copies next to it. mc-compose's `pnpm check:roster` reads those instead, deliberately; the",
+  'two gates answer different questions and docs/manifest.md §5.5 says which is which. If the two',
+  'disagree, compare the revisions above before believing either.',
+]
+
+/** One repository as it actually sat on disk when this run read it. */
+export type RepositoryProvenance = {
+  readonly name: string
+  /** Full SHA of `repos/<name>` HEAD, or `undefined` if it could not be read. */
+  readonly head: string | undefined
+  /** What `repos.json` names, or `undefined` for an unpinned entry. */
+  readonly pinned: string | undefined
+  readonly dirty: boolean
+}
+
+/** True when what was read is not what the manifest names. */
+export const isOffPin = (row: RepositoryProvenance): boolean =>
+  row.dirty || row.head === undefined || row.pinned === undefined || row.head !== row.pinned
+
+const shortSha = (sha: string | undefined): string => (sha === undefined ? 'unreadable' : sha.slice(0, 12))
+
+/**
+ * Name the revisions this run compared, and flag every one that is not the pin.
+ *
+ * A repository that is off its pin does not FAIL this gate — it is a perfectly
+ * ordinary state, and half of the point of `pnpm sync --latest` is to produce
+ * it deliberately. It is reported because a finding read against a revision the
+ * manifest does not name is a finding about something nobody has recorded, and
+ * whoever reads it needs to know that before they go looking for the drift in
+ * the mirror.
+ */
+export const describeProvenance = (
+  rows: ReadonlyArray<RepositoryProvenance>,
+): ReadonlyArray<string> => {
+  if (rows.length === 0) {
+    return [...MIRROR_SOURCE_NOTE, 'No repository under repos/ could be read.']
+  }
+
+  const off = rows.filter(isOffPin)
+  const lines: Array<string> = [
+    ...MIRROR_SOURCE_NOTE,
+    `${String(rows.length - off.length)} of ${String(rows.length)} repositories are at the revision repos.json pins.`,
+  ]
+
+  if (off.length === 0) {
+    return lines
+  }
+
+  lines.push(
+    `${String(off.length)} are NOT, so this run compared revisions the manifest does not name:`,
+  )
+  for (const row of off) {
+    lines.push(
+      `    ${row.name}  disk ${shortSha(row.head)}  pinned ${row.pinned === undefined ? 'unpinned' : shortSha(row.pinned)}` +
+        (row.dirty ? '  (uncommitted changes — disk is not any revision)' : ''),
+    )
+  }
+  lines.push(
+    '`pnpm sync` puts repos/ back on the pins; `pnpm update:manifest` records where it actually is.',
+  )
+
+  return lines
+}
+
 /**
  * The whole report, as lines.
  *
@@ -1082,6 +1176,12 @@ export const describeMirrorRun = (
     "sides' tests pin their own copy and agree with themselves. Fix the mirror in its own",
     'repository — or, if the divergence is intended, record it in DECLARED_DIVERGENCES in',
     'domain/mirror-contract.ts with the reason, so that it becomes a reviewed line in a diff.',
+    '',
+    // Repeated here rather than only at the top, because this is the block a
+    // failing run gets read from. The first time this gate failed, it named an
+    // export the working copy plainly had, and nothing in the message said the
+    // gate had not been looking at the working copy.
+    ...MIRROR_SOURCE_NOTE,
   )
 
   return lines
