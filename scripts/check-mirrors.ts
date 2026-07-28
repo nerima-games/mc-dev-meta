@@ -115,6 +115,7 @@ import {
   type PropertyObservation,
   type SampleVerdict,
   type SourceObservation,
+  type TranscribedColumn,
   type ValueObservation,
 } from '../domain/mirror-contract'
 import { loadManifest, provenanceOf } from './repos-provenance'
@@ -439,6 +440,64 @@ const readProperty = (
   }
 }
 
+/**
+ * kernel's list of property column names, e.g. `opacity`, `lightEmission`.
+ *
+ * Read from the owning barrel rather than restated here, because a list of
+ * kernel's columns hard-coded in mc-dev-meta would be one more hand-maintained
+ * transcription — the exact thing this file exists to catch going stale.
+ */
+const PROPERTY_NAMES = 'BLOCK_PROPERTY_NAMES'
+
+/**
+ * The `<column>OfBlockId` convention, which is what makes the coverage check
+ * possible without mc-dev-meta knowing anything about any specific column.
+ */
+const accessorFor = (property: string): string => `${property}OfBlockId`
+
+/**
+ * Which property columns does this mirror actually transcribe?
+ *
+ * Answered by LOOKING AT THE MIRROR, which is the whole point: `MIRROR_SPECS` is
+ * hand-maintained, so a check that asked it what to compare and then reported on
+ * what it compared could only ever confirm its own list. A column is transcribed
+ * if the mirror exports the accessor kernel names it by.
+ *
+ * The owning repository is resolved through the spec's declared probes where one
+ * exists and falls back to `spec.source`, which is right for every mirror in the
+ * workspace: the property tables live in the source barrel, and a probe naming a
+ * THIRD repository as owner has, by existing, already been declared.
+ */
+const transcribedColumns = (
+  mirror: Readonly<Record<string, unknown>>,
+  owners: ReadonlyMap<string, Readonly<Record<string, unknown>>>,
+): ReadonlyArray<TranscribedColumn> => {
+  const columns: Array<TranscribedColumn> = []
+
+  for (const [ownerName, owner] of owners) {
+    const names = owner[PROPERTY_NAMES]
+    if (!Array.isArray(names)) {
+      continue
+    }
+
+    for (const property of names) {
+      if (typeof property !== 'string') {
+        continue
+      }
+      const accessor = accessorFor(property)
+      // Both sides must have it. The mirror exporting it is what makes the
+      // column transcribed; the owner exporting it is what makes it PROBEABLE,
+      // and a column kernel keeps behind `propertyOfBlockId` alone cannot be
+      // compared symbol-for-symbol even if a mirror invented an accessor for it.
+      if (hasFunction(mirror, accessor) && hasFunction(owner, accessor)) {
+        columns.push({ mirrorExport: accessor, property, owner: ownerName })
+      }
+    }
+  }
+
+  return columns
+}
+
 // ---------------------------------------------------------------------------
 // One mirror
 // ---------------------------------------------------------------------------
@@ -499,8 +558,14 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
   // Both probe kinds read the same owning barrels, so they are loaded once for
   // the union of the two lists. `loadModule` caches anyway; doing it in one pass
   // is what keeps the skip-on-uninstalled decision in a single place.
+  // `spec.source` is in this set even when no probe names it, and that is the
+  // whole of the coverage check's reach. A mirror whose `properties` array is
+  // EMPTY is exactly the case §4.9.1(d) describes, and resolving owners from the
+  // declared probes alone would load nothing for it, observe no columns, and
+  // clear it — the check would be unable to see the only mirrors it exists for.
   const ownerNames = [
     ...new Set([
+      spec.source,
       ...spec.capabilities.map((probe) => probe.owner),
       ...spec.properties.map((probe) => probe.owner),
     ]),
@@ -554,6 +619,10 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
     types: typesIn(mirrorPath(spec), mirrorText).filter((shape) => shape.exported),
     capabilities,
     properties,
+    probeableColumns: transcribedColumns(
+      mirrorModule.module,
+      new Map(ownerNames.map((name) => [name, ownerModule(name)])),
+    ),
   }
 
   const source: SourceObservation = {

@@ -26,6 +26,7 @@ import {
   KNOWN_FINDINGS,
   MIRROR_SOURCE_NOTE,
   MIRROR_SPECS,
+  unprobedColumns,
   mirrorRunExitCode,
   REFINEMENT_SAMPLES,
   staleKnownFindings,
@@ -168,6 +169,9 @@ const agreeingMirror: MirrorObservation = {
   ],
   capabilities: [capability(AGREED_IDS, AGREED_IDS)],
   properties: [property(AGREED_OPACITIES)],
+  // The one column this fixture transcribes, and `spec` probes it. The pair
+  // agreeing is what makes this the AGREEING mirror for the coverage check too.
+  probeableColumns: [{ mirrorExport: 'opacityOfBlockId', property: 'opacity', owner: 'mc-kernel' }],
 }
 
 const agreeingSource: SourceObservation = {
@@ -285,6 +289,7 @@ describe('a closed literal union’s WIDTH is invisible here, by construction', 
       types: [alias('ItemType')],
       capabilities: [],
       properties: [],
+      probeableColumns: [],
     }
     const wide: SourceObservation = {
       values: [],
@@ -785,7 +790,7 @@ describe('an empty observation is a failure, not agreement', () => {
   it('fails when the mirror was loaded but yielded nothing', () => {
     const findings = compareSurfaces(
       spec,
-      { values: [], types: [], capabilities: [], properties: [] },
+      { values: [], types: [], capabilities: [], properties: [], probeableColumns: [] },
       agreeingSource,
     )
 
@@ -917,6 +922,106 @@ describe('a known outstanding defect is reported without failing the run', () =>
 
     expect(staleKnownFindings(skippedOnly, register)).toStrictEqual([])
     expect(mirrorRunExitCode(skippedOnly, register)).toBe(0)
+  })
+})
+
+/*
+ * THE COVERAGE HALF, and why the property probes above are not enough.
+ *
+ * Every check before this one asks "do the two sides agree on this column?" and
+ * can only ask it about a column `MIRROR_SPECS` names. That list is
+ * hand-maintained. So the failure it cannot see is a column nobody added a row
+ * for: it produces no `PropertyObservation`, appears in no comparison, and the
+ * run prints the same 13/13 it prints when everything is compared. kernel's
+ * audit §4.9.1(d) is exactly this — 「ミラーが転記している能力の数より probe が
+ * 少なければ、そのチェックは検査していない成功を報告する」.
+ *
+ * It is not hypothetical here either. mc-worldgen's stale `lightEmission` table
+ * was found ONLY because someone hand-added the second property row next to the
+ * `opacity` one. Had they added one and not the other, fourteen missing emitters
+ * would have gone on reading as dark behind a green gate.
+ *
+ * `unprobedColumns` closes it by asking the MIRROR what it transcribes rather
+ * than asking the spec what to compare.
+ */
+describe('a transcribed column with no probe fails, and names the column', () => {
+  const unprobed: MirrorObservation = {
+    ...agreeingMirror,
+    probeableColumns: [
+      { mirrorExport: 'opacityOfBlockId', property: 'opacity', owner: 'mc-kernel' },
+      // Transcribed by the mirror, absent from `spec.properties`. This is the
+      // mc-worldgen defect's shape exactly.
+      { mirrorExport: 'lightEmissionOfBlockId', property: 'lightEmission', owner: 'mc-kernel' },
+    ],
+  }
+
+  it('raises PropertyColumnUnprobed for the column the spec never declared', () => {
+    const findings = compareSurfaces(spec, unprobed, agreeingSource)
+
+    expect(findings).toStrictEqual([
+      {
+        _tag: 'PropertyColumnUnprobed',
+        symbol: 'lightEmissionOfBlockId',
+        owner: 'mc-kernel',
+        property: 'lightEmission',
+      },
+    ])
+  })
+
+  it('fails the run, rather than printing an uninspected success', () => {
+    expect(mirrorRunExitCode([compareMirror(spec, unprobed, agreeingSource, [])], [])).toBe(1)
+  })
+
+  it('names the column and the fix in the report', () => {
+    const rendered = describeMirrorRun([compareMirror(spec, unprobed, agreeingSource, [])]).join('\n')
+
+    expect(rendered).toContain('lightEmissionOfBlockId')
+    expect(rendered).toContain('"lightEmission" column')
+    expect(rendered).toContain('MIRROR_SPECS declares no property probe for it')
+  })
+
+  it('says nothing when every transcribed column is probed', () => {
+    expect(compareSurfaces(spec, agreeingMirror, agreeingSource)).toStrictEqual([])
+  })
+
+  /*
+   * The mirror-with-no-probes case, which is the one the check exists for: a
+   * spec whose `properties` array is empty is indistinguishable, in every other
+   * check here, from a mirror that transcribes no columns at all.
+   */
+  it('catches a spec that probes NOTHING while the mirror transcribes a column', () => {
+    const noProbes: MirrorSpec = { ...spec, properties: [] }
+    const findings = compareSurfaces(noProbes, { ...agreeingMirror, properties: [] }, agreeingSource)
+
+    expect(findings.map((finding) => finding._tag)).toStrictEqual(['PropertyColumnUnprobed'])
+  })
+
+  /*
+   * A declared divergence still exempts the column. The two lists mean different
+   * things: a divergence is a mirror that deliberately answers differently and
+   * SAID SO, which is the opposite of the silence this check is built against.
+   */
+  it('respects DECLARED_DIVERGENCES, because a stated divergence is not silence', () => {
+    const divergent = DECLARED_DIVERGENCES.find((entry) => entry.subject !== undefined)
+    expect(divergent).toBeDefined()
+
+    if (divergent !== undefined) {
+      const divergedSpec: MirrorSpec = {
+        ...spec,
+        repository: divergent.repository,
+        file: divergent.file,
+        properties: [],
+      }
+      const observed: MirrorObservation = {
+        ...agreeingMirror,
+        properties: [],
+        probeableColumns: [
+          { mirrorExport: divergent.subject, property: 'opacity', owner: 'mc-kernel' },
+        ],
+      }
+
+      expect(unprobedColumns(divergedSpec, observed.probeableColumns)).toStrictEqual([])
+    }
   })
 })
 

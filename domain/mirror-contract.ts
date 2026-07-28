@@ -541,6 +541,39 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     // The `FIRST_VERSION = 1` scalar IS compared for real, and it is the one
     // value on this mirror that a drift cannot survive.
   },
+  {
+    repository: 'mc-sim',
+    file: 'domain/worldgen-vocabulary.ts',
+    source: 'mc-worldgen',
+    renamedTypes: [],
+    capabilities: [],
+    properties: [],
+    // THE FIRST ROW IN THIS LIST WHOSE MIRROR IS A CLOSED UNION AND NOTHING
+    // ELSE, and the blind spot recorded on mc-sim's `kernel-vocabulary` row
+    // applies to it in full rather than in part.
+    //
+    // This mirror carries exactly one declaration — `Dimension`, a three-member
+    // literal union — and MEMBERSHIP IS THE TYPE. Neither probe kind reads a
+    // union's members: `observeValue` in `scripts/check-mirrors.ts` cannot see a
+    // type at all, and a type-only module exports no runtime value for it to
+    // compare. So this row asserts that the FILE EXISTS and that its source
+    // repository is mc-worldgen, and it asserts nothing whatever about whether
+    // the union still has three members or the same three.
+    //
+    // That is the roster blind spot mc-sim's other row paid seventy-four missing
+    // literals for, and the row is added anyway for the reason that one gives:
+    // a mirror ABSENT from this list is a mirror `scripts/check-mirrors.ts` will
+    // not even report as vanished, and `check:repoint` — which is what actually
+    // caught the `ITEM_TYPES` drift, by deleting the mirror and typechecking
+    // against the real module — reads `REPOINT_SPECS` against this list and
+    // rejects any repoint spec naming a mirror `MIRROR_SPECS` has never heard
+    // of. Registering it is what makes the stronger gate able to see it.
+    //
+    // Until the roster probe exists, `mc-sim/test/worldgen-mirror.test.ts` pins
+    // the three members from inside mc-sim. That is the weaker guarantee — a
+    // test the mirroring repository could edit in the same commit that breaks it
+    // — and this row should not be read as covering it.
+  },
 ]
 
 /**
@@ -889,11 +922,41 @@ export type PropertyObservation = {
 }
 
 /** What the shell observed about the mirror file. */
+/**
+ * A property column the mirror TRANSCRIBES, found by looking rather than by
+ * being told.
+ *
+ * kernel names its property readings by a fixed convention — column `opacity`
+ * is read through `opacityOfBlockId` — and publishes exactly three of them on
+ * its barrel. So a mirror that exports `<column>OfBlockId` for a column in
+ * kernel's `BLOCK_PROPERTY_NAMES` is, by that act, transcribing that column,
+ * whether or not anyone remembered to add a row to `MIRROR_SPECS`.
+ *
+ * This is the observation that lets `MIRROR_SPECS` be checked against reality
+ * instead of trusted. See `unprobedColumns` for what is done with it.
+ */
+export type TranscribedColumn = {
+  /** The accessor the mirror exports, e.g. `lightEmissionOfBlockId`. */
+  readonly mirrorExport: string
+  /** The kernel column it reads, e.g. `lightEmission`. */
+  readonly property: string
+  /** The repository whose property table that column belongs to. */
+  readonly owner: string
+}
+
 export type MirrorObservation = {
   readonly values: ReadonlyArray<ValueObservation>
   readonly types: ReadonlyArray<TypeShape>
   readonly capabilities: ReadonlyArray<CapabilityObservation>
   readonly properties: ReadonlyArray<PropertyObservation>
+  /**
+   * Every property column the mirror appears to transcribe.
+   *
+   * Required rather than optional, for the reason `properties` is: an absent
+   * array and an empty one read identically at the call site, so a caller that
+   * forgot the field would report "nothing transcribed" and pass.
+   */
+  readonly probeableColumns: ReadonlyArray<TranscribedColumn>
 }
 
 /** What the shell observed about the source repository's PUBLISHED surface. */
@@ -951,6 +1014,28 @@ export type MirrorFinding =
     }
   | {
       readonly _tag: 'PropertyProbeEmpty'
+      readonly symbol: string
+      readonly owner: string
+      readonly property: string
+    }
+  /**
+   * The mirror transcribes a property column that `MIRROR_SPECS` does not probe.
+   *
+   * kernel's audit §4.9.1(d) is the rule: 「ミラーが転記している能力の数より probe
+   * が少なければ、そのチェックは検査していない成功を報告する」. Every other finding
+   * in this union answers "do the two sides agree?"; this one answers the prior
+   * question, "was anything actually compared?", and it is the only finding that
+   * can be raised while every declared probe passes.
+   *
+   * It exists because the register below recorded two real defects that this
+   * gate DID find, and the reason it found them was that someone had thought to
+   * add the two property rows by hand. Nothing made them do it and nothing would
+   * have complained had they added only one — the check would have swept 256 ids
+   * of `opacity`, reported agreement on `lightEmission` by never reading it, and
+   * printed a clean 13/13.
+   */
+  | {
+      readonly _tag: 'PropertyColumnUnprobed'
       readonly symbol: string
       readonly owner: string
       readonly property: string
@@ -1194,6 +1279,38 @@ const compareCapabilities = (
 }
 
 /**
+ * Columns the mirror transcribes that `MIRROR_SPECS` never declared a probe for.
+ *
+ * `compareProperties` below checks that every DECLARED probe actually read
+ * something. This checks the other direction, which is the one that cannot be
+ * caught from inside the probe loop at all: a column with no row in
+ * `MIRROR_SPECS` contributes no `PropertyObservation`, so it is absent from
+ * every list the comparison walks and there is nothing to notice its absence.
+ * The count 13/13 counts specs, not columns, so it stays 13/13.
+ *
+ * `DECLARED_DIVERGENCES` still exempts a column, exactly as it does for a
+ * declared probe: a mirror that deliberately answers differently from its source
+ * has said so, and saying so is the point of that list. What is NOT accepted is
+ * silence.
+ */
+export const unprobedColumns = (
+  spec: MirrorSpec,
+  observed: ReadonlyArray<TranscribedColumn>,
+): ReadonlyArray<MirrorFinding> => {
+  const probed = new Set(spec.properties.map((probe) => probe.mirrorExport))
+
+  return observed
+    .filter((column) => !probed.has(column.mirrorExport))
+    .filter((column) => divergenceFor(spec, column.mirrorExport) === undefined)
+    .map((column) => ({
+      _tag: 'PropertyColumnUnprobed' as const,
+      symbol: column.mirrorExport,
+      owner: column.owner,
+      property: column.property,
+    }))
+}
+
+/**
  * Diff one property column, id by id, over the owning table's whole range.
  *
  * The empty-readings guard is the per-probe restatement of `compareSurfaces`'s
@@ -1282,6 +1399,9 @@ export const compareSurfaces = (
     ...compareTypes(spec, mirror.types, source),
     ...compareCapabilities(spec, mirror.capabilities),
     ...compareProperties(spec, mirror.properties),
+    // Runs on the OBSERVED columns rather than the declared probes, so it is the
+    // one check here that can fail a spec whose every declared probe passed.
+    ...unprobedColumns(spec, mirror.probeableColumns),
   ]
 }
 
@@ -1427,6 +1547,16 @@ export const describeMirrorFinding = (spec: MirrorSpec, finding: MirrorFinding):
         'agreement. Either the owning table exposes an empty id range or the probe is broken. ' +
         'A column compared against nothing agrees with everything, which is the one result this ' +
         'checker must never produce.'
+      )
+    case 'PropertyColumnUnprobed':
+      return (
+        `${at}: it exports ${finding.symbol}, which transcribes ${finding.owner}'s ` +
+        `"${finding.property}" column, and MIRROR_SPECS declares no property probe for it. ` +
+        'Nothing compared that column on this run and nothing reported it as uncompared: the ' +
+        'spec count is a count of SPECS, so a mirror missing a probe still prints as a pass. ' +
+        `Add { mirrorExport: '${finding.symbol}', owner: '${finding.owner}', property: ` +
+        `'${finding.property}' } to this spec's properties in domain/mirror-contract.ts, or, if ` +
+        'the mirror answers differently on purpose, record it in DECLARED_DIVERGENCES.'
       )
     case 'NothingObserved':
       return `${at}: ${finding.detail}`
