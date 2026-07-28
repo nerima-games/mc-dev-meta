@@ -1057,7 +1057,20 @@ describe('the committed KNOWN_FINDINGS register', () => {
       entry.fingerprint.includes('"_tag":"PropertyDiffers"'),
     )
 
-    expect(property).toHaveLength(2)
+    // ZERO, and it was two: `opacity` stale on 25 ids and `lightEmission` on 14.
+    // Both are repaired, so both entries are gone.
+    //
+    // The gate reported each disappearance BY NAME rather than passing quietly —
+    // 「the entry is now suppressing nothing but the next occurrence. Delete it.」
+    // A known-defect register checked in one direction only drifts pessimistic,
+    // and a list nobody believes has stopped being evidence. **Going green is an
+    // event here.**
+    //
+    // The loop below is kept for the day a property finding returns: it asserts
+    // such an entry names the repository that owns the FIX, not the one that
+    // detected it. Over an empty array it asserts nothing, and that is honest
+    // rather than hidden — the length assertion above is what has teeth today.
+    expect(property).toHaveLength(0)
     for (const entry of property) {
       expect(entry.fingerprint.startsWith('mc-worldgen/domain/kernel-vocabulary.ts|')).toBe(true)
       expect(entry.owner).toBe('mc-worldgen')

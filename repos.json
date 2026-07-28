@@ -34,12 +34,12 @@
     {
       "name": "mc-worldgen",
       "url": "https://github.com/nerima-games/mc-worldgen.git",
-      "ref": "b712d20d4eba3d5849626bde17c41edd9d077971"
+      "ref": "7af0e82157dbe85bb2fdf554e6a708ae23defd92"
     },
     {
       "name": "mc-sim",
       "url": "https://github.com/nerima-games/mc-sim.git",
-      "ref": "3d75ce299d4a642f34bac85a0c2c2b57d602c00a"
+      "ref": "06be5074bfb0f2f23aacd2782a125d938c0221f8"
     },
     {
       "name": "mc-render",
@@ -54,7 +54,7 @@
     {
       "name": "mx-gameplay",
       "url": "https://github.com/nerima-games/mx-gameplay.git",
-      "ref": "ec888b84bfb53da845271592810830c0b9573d5f"
+      "ref": "a943aaa797f454812107ab82604bc41e105eeefd"
     },
     {
       "name": "mx-redstone",

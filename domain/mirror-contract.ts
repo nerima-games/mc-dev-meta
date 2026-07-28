@@ -744,40 +744,21 @@ export type KnownFinding = {
  * better, delete it because mc-worldgen fixed the table.
  */
 export const KNOWN_FINDINGS: ReadonlyArray<KnownFinding> = [
-  {
-    fingerprint:
-      'mc-worldgen/domain/kernel-vocabulary.ts|{"_tag":"PropertyDiffers","symbol":"opacityOfBlockId","owner":"mc-kernel","property":"opacity","disagreements":[{"id":"48 (ice)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"71 (wheat_crop)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"72 (potato_crop)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"73 (nether_wart_crop)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"74 (redstone_wire)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"75 (redstone_torch)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"76 (lever)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"77 (stone_button)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"78 (repeater)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"89 (end_portal)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"90 (chorus_flower)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"91 (chorus_plant)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"92 (dragon_egg)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"93 (end_crystal)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"94 (end_gateway)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"95 (end_rod)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"100 (purpur_slab)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"101 (purpur_stairs)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"106 (door)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"107 (door_open)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"108 (oak_stairs)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"112 (bed)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"114 (brewing_stand)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"118 (nether_portal)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""},{"id":"119 (fire)","mirror":"\\"opaque\\"","owner":"\\"transparentSolid\\""}]}',
-    summary:
-      "mc-worldgen's opacity transcription is stale on 25 ids. Kernel's roster grew past the " +
-      'block-35 boundary the table was last re-derived at, and ice, the three crops, the redstone ' +
-      'wiring, the End blocks, the slabs and stairs, both doors, the bed, the brewing stand, the ' +
-      'nether portal and fire are all transparentSolid in kernel and read as opaque here.',
-    owner: 'mc-worldgen',
-    fix:
-      'Add the 25 rows to NON_OPAQUE_BLOCK_OPACITIES in domain/kernel-vocabulary.ts and extend ' +
-      "test/kernel-mirror.test.ts's exhaustive pin to kernel's current range. The direction is " +
-      'the DARK one, which DN-7 names as non-conservative: every one of these cells is read as ' +
-      'blocking light that kernel says passes, so the light grid is too dark around them and ' +
-      'hostile-spawn.ts will permit a spawn it should refuse. Reachable only through ' +
-      'ChunkStore.setBlock, since generated terrain writes ids 0-10 — which is why no golden ' +
-      'fixture moved.',
-  },
-  {
-    fingerprint:
-      'mc-worldgen/domain/kernel-vocabulary.ts|{"_tag":"PropertyDiffers","symbol":"lightEmissionOfBlockId","owner":"mc-kernel","property":"lightEmission","disagreements":[{"id":"44 (amethyst_cluster)","mirror":"0","owner":"15"},{"id":"54 (redstone_ore)","mirror":"0","owner":"9"},{"id":"61 (deepslate_redstone_ore)","mirror":"0","owner":"9"},{"id":"68 (redstone_block)","mirror":"0","owner":"15"},{"id":"75 (redstone_torch)","mirror":"0","owner":"7"},{"id":"80 (redstone_lamp_lit)","mirror":"0","owner":"15"},{"id":"87 (end_portal_frame)","mirror":"0","owner":"1"},{"id":"88 (end_portal_frame_filled)","mirror":"0","owner":"3"},{"id":"89 (end_portal)","mirror":"0","owner":"15"},{"id":"94 (end_gateway)","mirror":"0","owner":"15"},{"id":"95 (end_rod)","mirror":"0","owner":"15"},{"id":"97 (ender_chest)","mirror":"0","owner":"15"},{"id":"118 (nether_portal)","mirror":"0","owner":"11"},{"id":"119 (fire)","mirror":"0","owner":"15"}]}',
-    summary:
-      "mc-worldgen's lightEmission transcription is stale on 14 ids. It carries the three " +
-      'emitters it was written with (lava, torch, glowstone) while kernel now has seventeen: the ' +
-      'redstone family, the amethyst cluster, the End blocks, the ender chest, the nether portal ' +
-      'and fire all emit in kernel and read as 0 here.',
-    owner: 'mc-worldgen',
-    fix:
-      'Add the 14 rows to BLOCK_LIGHT_EMISSION in domain/kernel-vocabulary.ts, with the levels ' +
-      "kernel gives (they are not uniform: 9 for redstone ore, 7 for a redstone torch, 1 and 3 " +
-      'for the two end_portal_frame states, 11 for the nether portal, 15 for the rest). Same ' +
-      'DARK direction as the opacity entry above, and the same reason nothing caught it. The ' +
-      "file's own comment calls the three-row table 'luck rather than design'; the luck ran out.",
-  },
+  // EMPTY, and both entries that were here are gone because they were FIXED.
+  //
+  // They recorded mc-worldgen's kernel mirror drifting on two property tables:
+  // `opacity` stale on 25 ids and `lightEmission` on 14, every one reading as the
+  // kernel default. For opacity that default is opaque and for emission it is dark,
+  // and DN-7 names dark as the non-conservative direction -- a cell read darker
+  // than it is lets a hostile spawn where `hostile-spawn.ts` would have refused.
+  //
+  // What is worth keeping is how they left. The gate did not simply pass: it
+  // reported each disappearance BY NAME and told the reader to delete the entry,
+  // because 「the entry is now suppressing nothing but the next occurrence」.
+  //
+  // A known-defect register checked in one direction only drifts pessimistic, and a
+  // list nobody believes has stopped being evidence. So going green is an event
+  // here, not a silence.
 ]
 
 /**
