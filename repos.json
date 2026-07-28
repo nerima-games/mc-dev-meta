@@ -4,7 +4,7 @@
     {
       "name": "mc-kernel",
       "url": "https://github.com/nerima-games/mc-kernel.git",
-      "ref": "8c7aace13b7f3f73f87495ae3d58a949be56979d"
+      "ref": "6f9f6ef8f479ebae4a3f4872429a33b8af066260"
     },
     {
       "name": "mc-noise",
@@ -19,12 +19,12 @@
     {
       "name": "mc-physics",
       "url": "https://github.com/nerima-games/mc-physics.git",
-      "ref": "d76528cbd9be2d0382239a82549c550301e4b748"
+      "ref": "96a1fc8dceaf46cc3e247a194e501c321761fb64"
     },
     {
       "name": "mc-save",
       "url": "https://github.com/nerima-games/mc-save.git",
-      "ref": "4ceb4ff049c8bfa636e2b6f60e3d04e7e0a2a0d9"
+      "ref": "1cc99eab5bfc8f201a48ab97f4dfbb682a989bda"
     },
     {
       "name": "mc-audio",
@@ -34,7 +34,7 @@
     {
       "name": "mc-worldgen",
       "url": "https://github.com/nerima-games/mc-worldgen.git",
-      "ref": "c3135b4c9771597ad50ef0cfc988bde4bbf3ad7d"
+      "ref": "a63313cd435bc72b69533965812e5f70e3f7a7c3"
     },
     {
       "name": "mc-sim",
@@ -44,12 +44,12 @@
     {
       "name": "mc-render",
       "url": "https://github.com/nerima-games/mc-render.git",
-      "ref": "93dce8bf1633abe27e4095bb8e3f5e683bb64a75"
+      "ref": "9b52570433fefb8731108019171fc3c9ee2e7742"
     },
     {
       "name": "mc-playground-kit",
       "url": "https://github.com/nerima-games/mc-playground-kit.git",
-      "ref": "8962fdaef92cd0e436fcd991a01b00654cd3f4e8"
+      "ref": "01b42f03e8b6aea11375c384e9cebf6f9f7639d0"
     },
     {
       "name": "mx-gameplay",
@@ -74,7 +74,7 @@
     {
       "name": "mc-compose",
       "url": "https://github.com/nerima-games/mc-compose.git",
-      "ref": "85cd5c69b3a8673b5fc58afce39bec5953a9247a"
+      "ref": "64a6da4b465c9db8ba43db302ee9fabbf8cd6361"
     }
   ]
 }
