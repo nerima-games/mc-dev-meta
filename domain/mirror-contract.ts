@@ -415,6 +415,69 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
       { mirrorExport: 'supportRuleOfBlockId', owner: 'mc-kernel', property: 'supportRule' },
     ],
   },
+  {
+    // The FOURTH source repository this list has ever pointed at — mc-kernel,
+    // mc-worldgen and mc-sim were the other three — and the first mirror of
+    // mc-save anywhere in the organisation.
+    //
+    // It is worth saying why it did not exist until now, because the reason was
+    // not technical. mc-worldgen's `docs/responsibility.md` §1-5 recorded the
+    // chunk format as 「⬜ publish 待ち」 and justified it with 「import できない
+    // 理由は `domain/kernel-vocabulary.ts` と同じ」 — a sentence that is true and
+    // refutes its own conclusion, since `kernel-vocabulary.ts` is not a file
+    // that waited for a publish, it is the file that made waiting unnecessary.
+    // The blocker was a missing mirror, and the row below is what makes the
+    // replacement mirror checkable rather than merely present.
+    repository: 'mc-worldgen',
+    file: 'domain/save-format-port.ts',
+    source: 'mc-save',
+    // NOTHING is renamed, and this gate is what checks that rather than a note.
+    // The mirror's header records the rule the organisation paid for: a mirror
+    // that renames a symbol typechecks, passes every local test, and yields a
+    // name that does not exist on repoint day.
+    renamedTypes: [],
+    // EMPTY AND CORRECT. mc-save owns no block table and no capability flags —
+    // it is deliberately ignorant of what is being saved (`mc-save/index.ts`:
+    // 「no opinion about what is being saved」). A probe row here would be the
+    // misplacement the note under this list records, and it would additionally
+    // exempt its symbol from the "is it on the source's barrel?" check, which is
+    // the strongest thing this row has.
+    capabilities: [],
+    // Empty for the same reason: no property column exists to compare.
+    properties: [],
+    // -----------------------------------------------------------------------
+    // THIS ROW'S BLIND SPOT, recorded because the row above looks complete.
+    // -----------------------------------------------------------------------
+    //
+    // The mirror exports `SaveEnvelopeSchema`, and a `Schema` is neither a
+    // scalar, a tag, nor a `Brand.refined` constructor — so `observeValue` in
+    // `scripts/check-mirrors.ts` reduces it to `Opaque{kind:'object'}`. This
+    // gate therefore compares "both sides export an object called
+    // SaveEnvelopeSchema" and NOTHING about the refinements inside it. mc-save
+    // constrains the format name with `minLength(1)` and the version with
+    // `int()` and `greaterThanOrEqualTo(FIRST_VERSION)`; a mirror that kept the
+    // three field names and dropped all three refinements would be reported as
+    // agreement here.
+    //
+    // That is the same shape as the `ITEM_TYPES` roster blind spot recorded on
+    // mc-sim's row — kernel's audit §4.9.1(d), 「ミラーが転記している能力の数より
+    // probe が少なければ、そのチェックは検査していない成功を報告する」 — with
+    // `capability` replaced by `refinement`. A `Schema` is not a `Brand.refined`
+    // constructor, so the existing `Refinement` observation cannot reach it; the
+    // fix would be a fourth probe kind (decode a fixed sample grid through both
+    // schemas and compare the accept/reject vectors, exactly as
+    // `REFINEMENT_SAMPLES` does for brands), and it is deliberately NOT
+    // attempted in the change that adds this mirror, because it alters
+    // `MirrorSpec` for all twelve specs.
+    //
+    // Until it exists, `mc-worldgen/test/save-format-mirror.test.ts` SF-3 pins
+    // the three refinements from inside mc-worldgen. That is the weaker
+    // guarantee — a test the mirroring repository could edit in the same commit
+    // that breaks it — and this row should not be read as covering it.
+    //
+    // The `FIRST_VERSION = 1` scalar IS compared for real, and it is the one
+    // value on this mirror that a drift cannot survive.
+  },
 ]
 
 /**
