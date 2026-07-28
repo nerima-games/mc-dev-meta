@@ -14,12 +14,12 @@
     {
       "name": "mc-meshing",
       "url": "https://github.com/nerima-games/mc-meshing.git",
-      "ref": "5d0d0c2a2dda52d9d13ba9244c3bb276da2dc640"
+      "ref": "c5a9ae66ba79ef6dac2d75d24bdff7669f4b872a"
     },
     {
       "name": "mc-physics",
       "url": "https://github.com/nerima-games/mc-physics.git",
-      "ref": "96a1fc8dceaf46cc3e247a194e501c321761fb64"
+      "ref": "a6e5e79d20c7848c70aa855d7c48d025b3d4d7c7"
     },
     {
       "name": "mc-save",
@@ -44,7 +44,7 @@
     {
       "name": "mc-render",
       "url": "https://github.com/nerima-games/mc-render.git",
-      "ref": "9b52570433fefb8731108019171fc3c9ee2e7742"
+      "ref": "78998f2b5a38b24b8d3c3d0f44061945461e7e53"
     },
     {
       "name": "mc-playground-kit",
@@ -54,7 +54,7 @@
     {
       "name": "mx-gameplay",
       "url": "https://github.com/nerima-games/mx-gameplay.git",
-      "ref": "a943aaa797f454812107ab82604bc41e105eeefd"
+      "ref": "64fa86ad03eb80f1f8bde741ed7138055b4eee2a"
     },
     {
       "name": "mx-redstone",
@@ -64,7 +64,7 @@
     {
       "name": "mx-ui",
       "url": "https://github.com/nerima-games/mx-ui.git",
-      "ref": "d09d4c4d125f20e7fac43bc1277fb1b0ceabc07b"
+      "ref": "036c51910277152e8e6fd28c170d7e8466a6248e"
     },
     {
       "name": "mx-multiplayer",
@@ -74,7 +74,7 @@
     {
       "name": "mc-compose",
       "url": "https://github.com/nerima-games/mc-compose.git",
-      "ref": "6024fcc20fcd0af9982f25636ec5cea92f4212bd"
+      "ref": "0cf21f1dc5befe0e3e8d7ba9c64f0a804dcb6511"
     }
   ]
 }
