@@ -271,6 +271,27 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     // gate, and this gate should not be read as covering it.
   },
   { repository: 'mc-render', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
+  {
+    repository: 'mc-render',
+    file: 'domain/lod-vocabulary.ts',
+    source: 'mc-meshing',
+    // NOTHING IS RENAMED, and for this mirror that is load-bearing rather than
+    // incidental. `LOD_LEVELS`, `LodLevel`, `LodLevelSchema`, `STEP_FOR_LOD` and
+    // `CHUNK_SIZE` all keep mc-meshing's spelling. The rule the organisation
+    // learned from `isSupportSensitiveRule`: a renamed mirror type-checks,
+    // passes every test, matches on shape, and fails on the one day the import
+    // is repointed — because the name it was renamed TO does not exist upstream.
+    // When a mirror name collides with a local one, the local one moves.
+    renamedTypes: [],
+    // No capability table on either side: `STEP_FOR_LOD` is a table of NUMBERS
+    // keyed by level, not of predicates keyed by block id, so neither probe kind
+    // applies. It is compared by the ordinary value comparison, which is what
+    // this gate does with any exported const — and that is sufficient here in a
+    // way it was NOT for `opacityOfBlockId`, because the table is three entries
+    // over a closed union rather than a lookup over 120 block ids.
+    capabilities: [],
+    properties: [],
+  },
   { repository: 'mc-playground-kit', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
   { repository: 'mc-compose', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
   {
