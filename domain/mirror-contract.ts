@@ -367,6 +367,69 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     properties: [],
   },
   {
+    // THE FIRST MIRROR IN THIS LIST WITH NO CALLER, and the row matters more for
+    // that rather than less.
+    //
+    // Every other spec here names a file some stage or rule imports, so a drift
+    // in it eventually breaks a test in its own repository — `check:mirrors` is
+    // the second line of defence. `mx-gameplay/domain/player-port.ts` is
+    // imported by nothing but its own mirror test: it was written because
+    // `docs/testing.md` §3-1's last ⬜ turned out to be waiting on a MIRROR
+    // rather than on 「mc-sim の名簿」, and the half of that row it does not close
+    // is blocked on a noun no repository owns (there is no `Dimension` in
+    // mc-kernel or mc-sim, measured). So nothing calls `moveTo` yet, and this
+    // row plus that test are the whole of what holds the transcription.
+    //
+    // That is exactly the state the `ChunkStore` capability predicates were in —
+    // 「a mirror outside this list is a mirror nobody compares」 — with the
+    // aggravating factor that here there is no stage to break either.
+    repository: 'mx-gameplay',
+    file: 'domain/player-port.ts',
+    source: 'mc-sim',
+    // NOTHING is renamed, and this gate is what checks it rather than a note.
+    // `PlayerPose.feetPosition` is the field most likely to be "tidied" into
+    // `position`, and it must not be: plan.md §3.4 records that every "things
+    // are floating" defect in the reference was a feet-origin/AABB-centre
+    // mismatch, so the field name carries the convention.
+    renamedTypes: [],
+    // EMPTY, AND IT MUST STAY EMPTY, for `domain/inventory-port.ts`'s reason
+    // above with different symbols. A probe row exempts its symbol from the "is
+    // it on the source's barrel?" check, and the symbols this mirror is most
+    // likely to grow — `ClockPort` and `CameraPoseSnapshot` — are precisely the
+    // two mc-sim's barrel does NOT hand back, because mc-sim deliberately does
+    // not re-export its own kernel mirror. They live in mx-gameplay's
+    // `domain/frame-contract.ts` instead, which is a spec in this same list and
+    // is repointed at mc-kernel. A probe row here would hide that.
+    capabilities: [],
+    // Empty: a player port holds no block table, so there is no column here to
+    // compare.
+    properties: [],
+    // -----------------------------------------------------------------------
+    // THIS ROW'S BLIND SPOT, recorded because the row above looks complete.
+    // -----------------------------------------------------------------------
+    //
+    // `domain/type-shape.ts` compares member NAMES and OPTIONALITY, not member
+    // TYPES — `domain/repoint-plan.ts` states it plainly, 「because the mirrors
+    // diverge in their types on purpose」. This mirror has one member where that
+    // is not a tolerable divergence but a compile error waiting for repoint day:
+    //
+    //     cameraPose: Effect.Effect<CameraPoseSnapshot, never, ClockPort>
+    //
+    // The `R` channel is the only place in mx-gameplay where a mirrored
+    // signature names a service, and a mirror that narrowed it to
+    // `Effect<CameraPoseSnapshot>` would pass this gate with the member present
+    // and correctly spelled. mc-compose has already paid for exactly this shape
+    // once — 「The previous local `StageRegistration` dropped the R channel
+    // entirely (`Effect<void>`); R does not erase itself」.
+    //
+    // Same sentence as the `ITEM_TYPES` and `SaveEnvelopeSchema` blind spots
+    // above (kernel's audit §4.9.1(d)) with `capability` replaced by
+    // `requirement`. Until a probe kind can reach it,
+    // `mx-gameplay/test/player-mirror.test.ts` pins it with a two-direction
+    // assignment off the real member type, and `check:repoint` would catch it
+    // from outside; neither is this gate.
+  },
+  {
     repository: 'mx-gameplay',
     file: 'domain/block-vocabulary.ts',
     source: 'mc-kernel',
