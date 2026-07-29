@@ -13,7 +13,7 @@ export default defineConfig({
         singleFork: false,
       },
     },
-    include: ['test/**/*.{test,spec}.ts'],
+    include: ['test/**/*.test.ts'],
     // `repos/` holds 15 separate projects with their own test suites. Running
     // them from here would be `pnpm check:workspace`'s job, not vitest's.
     exclude: ['**/node_modules/**', '**/dist/**', '**/coverage/**', '**/.git/**', 'repos/**'],
@@ -53,7 +53,7 @@ export default defineConfig({
     },
   },
   esbuild: {
-    target: 'node22',
+    target: 'node24',
     format: 'esm',
     platform: 'node',
   },

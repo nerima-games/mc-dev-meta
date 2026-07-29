@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         # Pinned to a commit, not the mutable v4 tag: this is a third-party action
@@ -26,9 +26,9 @@ jobs:
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "pnpm"
           # pnpm-lock.yaml is gitignored — see .gitignore for why a
           # workspace-root lockfile describing gitignored packages is not a
@@ -38,7 +38,7 @@ jobs:
           cache-dependency-path: package.json
 
       - name: Install dependencies
-        # --ignore-scripts: pnpm 9 runs postinstall, and a fork PR can edit
+        # --ignore-scripts: pnpm runs postinstall, and a fork PR can edit
         # package.json and the lockfile consistently and still satisfy
         # --frozen-lockfile. Nothing here needs a lifecycle script. This is the
         # check that actually protects the runner, and it is unaffected by the
@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage
           path: coverage/

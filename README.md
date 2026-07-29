@@ -43,11 +43,13 @@ plan.md §6 Step 0 item 2:
 ## クイックスタート
 
 ```console
-$ direnv allow          # flake.nix の devShell で nodejs_22 + corepack が入る
+$ direnv allow          # flake.nix の devShell で nodejs_24 + corepack が入る
 $ pnpm install          # このリポジトリ自身の devDependencies
 $ pnpm sync             # 15 リポジトリを repos/ へ clone
 $ pnpm install          # ここで repos/* が workspace として解決される
 ```
+
+Nix を使わない場合は Node.js 24 以上と pnpm 11 を用意する。
 
 `pnpm sync` の後に `pnpm install` をもう一度打つのが要点である。
 1 回目は `repos/` が空なので workspace メンバーがおらず、
