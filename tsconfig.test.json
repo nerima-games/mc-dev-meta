@@ -7,6 +7,6 @@
     "target": "ES2024",
     "module": "ESNext"
   },
-  "include": ["index.ts", "domain/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"],
   "exclude": ["node_modules", "repos", "coverage", "dist"]
 }

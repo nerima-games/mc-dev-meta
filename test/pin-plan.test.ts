@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { UNPINNED, type ManifestEntry } from '../domain/manifest'
+import { UNPINNED, type ManifestEntry } from '../src/domain/manifest'
 import {
   describePinDecision,
   planPin,
@@ -7,8 +7,8 @@ import {
   summarisePins,
   type PinDecision,
   type PinObservation,
-} from '../domain/pin-plan'
-import type { RemoteObservation, SyncMode } from '../domain/sync-plan'
+} from '../src/domain/pin-plan'
+import type { RemoteObservation, SyncMode } from '../src/domain/sync-plan'
 
 const SHA_A = 'a'.repeat(40)
 const SHA_B = 'b'.repeat(40)

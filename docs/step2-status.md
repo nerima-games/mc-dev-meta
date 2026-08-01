@@ -97,9 +97,10 @@ THREE.js も必要とせず、`mc-worldgen` の公開 API だけで動く。し�
 ## 4. 誤読しないこと
 
 - **「何も進んでいない」ではない。** 16 リポジトリすべてで
-  `pnpm verify`（typecheck / lint / check:deps / api:check / test）は green であり、
-  依存ホワイトリスト・API ロック・stage 契約・回帰テスト名といった**ゲートのほうが先に実在している**。
-  plan.md §6 Step 2 のもう半分の条件（「テスト green」）は満たされている。
+  `pnpm verify`(typecheck / lint / test。旧構成の `check:deps` と `api:check` は
+  org 全体で撤去済み — DEPENDENCY_POLICY.md、API_STANDARD.md §4)は green であり、
+  stage 契約・回帰テスト名といった**ゲートのほうが先に実在している**。
+  plan.md §6 Step 2 のもう半分の条件(「テスト green」)は満たされている。
 - **各リポジトリの `docs/` は嘘を書いていない。** どの `docs/testing.md` も自分の完了条件を ❌ と書いている。
   欠けていたのは横断の集計だけで、本書がそれである。
 - **この数字は kit の publish で一気に動く。ただし全部ではない。** 一人称で操作する

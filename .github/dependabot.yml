@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # This repository intentionally .gitignores its own pnpm-lock.yaml (see
+  # .gitignore and ci.yaml's "Install dependencies" comment): a workspace-root
+  # lockfile would describe repos/*, which are gitignored clones, not
+  # committable state. That absence does not block Dependabot here — it can
+  # still open PRs against the caret ranges in package.json's devDependencies
+  # without a lockfile to update. See SUPPLY_CHAIN.md "Dependabot" for why the
+  # npm entry is added despite the missing lockfile.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"

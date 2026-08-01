@@ -7,20 +7,22 @@
  * Why this lives here
  * ---------------------------------------------------------------------------
  *
- * Every repository carries a copy of the graph inside
- * `scripts/check-dependency-whitelist.ts`, because the gate has to work with no
- * network and no siblings checked out. Those copies are mirrors, kept in sync
- * by hand.
+ * Each repository used to carry its own hand-maintained copy of this graph
+ * inside `scripts/check-dependency-whitelist.ts`, so the Tier boundary check
+ * could run with no network and no siblings checked out. `test/roster.test.ts`
+ * used to assert that this module and this repository's own copy of that
+ * script agreed edge for edge.
+ *
+ * That script (and its per-repository copies) were retired org-wide
+ * (DEPENDENCY_POLICY.md, API_STANDARD.md §4): the Tier import boundary is now
+ * expressed per repository as `.oxlintrc.json#no-restricted-imports`, not as a
+ * hand-copied graph object, so there is no longer a second copy to drift
+ * against and check here.
  *
  * mc-dev-meta is the repository whose entire job is knowing about the other 15
  * (plan.md §6 Step 0 item 2), so the authoritative statement of the roster
- * belongs here. `test/roster.test.ts` asserts that this module and this
- * repository's copy of the check script agree edge for edge, which at least
- * makes drift impossible WITHIN this repository, and gives the other 15 a
- * single place to diff against.
- *
- * The eventual answer is for this module to be published and consumed by the
- * check script in every repository — see docs/workflow.md.
+ * still belongs here: `pnpm sync`, `pnpm update:manifest`, `pnpm
+ * check:workspace`, `pnpm check:mirrors` and `pnpm check:repoint` all read it.
  */
 
 /** The npm scope shared by every repository in the project. */

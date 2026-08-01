@@ -224,23 +224,22 @@ plan.md §6 Step 0 item 2 と §8:
 mc-kernel の 1 行変更が 15 リポジトリの bump 連鎖を引き起こす。
 それは「面倒」ではなく、**界面がまだ動いている時期には作業が進まなくなる**という問題である。
 
-### 5.2 移行の条件(plan.md §6 Step 3)
+### 5.2 移行の条件(plan.md §6 Step 3、その後 RELEASE_STANDARD.md §4 に置き換え)
 
 > 界面が安定した(**API ロック 4 週間無変更**)リポジトリから GitHub Packages 等へ npm 公開 +
 > changesets 運用に切り替え。それまでは dev-meta workspace 統合で開発
 
-**「4 週間 API ロック無変更」が唯一の開始条件である。** 具体的には:
+**この「4 週間 API ロック無変更」という日数計測ベースの自動条件は org 全体で廃止された**
+(RELEASE_STANDARD.md §4.1)。`api-lock.md` / `pnpm api:check` / `pnpm api:update` は
+全 16 リポジトリから撤去され、このリポジトリが横断で鮮度を計測していた
+`scripts/check-api-lock-window.ts`(`pnpm check:api-window`)も、計測対象が無くなったため
+同時に削除した。
 
-1. そのリポジトリの公開 API レポート(API ロックファイル)が
-2. **4 週間、1 度も変更されていない**
-
-途中で 1 行でも変わったら、4 週間は**そこから数え直し**である。
-
-この「API ロックファイル」は 16 リポジトリすべてに実在する `api-lock.md` であり、
-`pnpm api:check` が `pnpm verify` と CI で鮮度を検査する
-([versioning.md](./versioning.md) §2.1、[public-api.md](./public-api.md) §5)。
-計測は `api-lock.md` が最後に変わったコミットを見るだけで済む。
-ただし 16 リポジトリぶんを 1 つのレポートに集約する仕組みはまだ無い。
+**代わりに、1.0.0 への昇格は maintainer(take)の裁量判断による**
+(RELEASE_STANDARD.md §4.2、[versioning.md](./versioning.md) §2.1)。実質的なトリガーは
+上位階層がそのパッケージを実際に消費して動作確認を終えたことだが、それをもって
+自動的に昇格するわけではなく、maintainer がその結果を踏まえて 1.0.0 昇格の
+changeset(`major` bump)を書く。
 
 ### 5.3 移行は階層ごとに、下から
 

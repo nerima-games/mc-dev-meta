@@ -16,12 +16,11 @@
  *
  * Plain vitest, not `@effect/vitest` and `it.effect` — this repository has no
  * runtime dependencies at all, not even `effect`, for the reason recorded in
- * `index.ts` and `domain/manifest.ts`: it is the tool that fetches the packages
- * and therefore cannot be bootstrapped from them. `test/api-lock-window.test.ts`
- * and `test/api-lock.test.ts` say the same thing at the top of themselves.
+ * `src/index.ts` and `src/domain/manifest.ts`: it is the tool that fetches the
+ * packages and therefore cannot be bootstrapped from them.
  */
 import { describe, expect, it } from 'vitest'
-import { MIRROR_SPECS } from '../domain/mirror-contract'
+import { MIRROR_SPECS } from '../src/domain/mirror-contract'
 import {
   classifyRepoint,
   describeRepointRun,
@@ -43,7 +42,7 @@ import {
   type ProjectResult,
   type RepointOutcome,
   type RepointSpec,
-} from '../domain/repoint-plan'
+} from '../src/domain/repoint-plan'
 
 // ---------------------------------------------------------------------------
 // Fixtures

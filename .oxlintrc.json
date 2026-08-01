@@ -3,14 +3,20 @@
   // oxlint is the ONLY lint/format configuration in this repository.
   // There is deliberately no prettier, no biome and no .editorconfig.
   //
-  // NOTE on the `Date.now()` ban (see README 現状 / scripts/check-dependency-whitelist.ts):
-  // oxlint 0.12 does not implement `no-restricted-syntax` or `no-restricted-properties`,
-  // and while `no-restricted-globals` is listed by `oxlint --rules` it is not implemented
-  // either (no checkmark). Verified empirically against oxlint 0.12.0: a file containing
-  // `Date.now()` produces 0 diagnostics under all three rules. The ban is therefore
-  // enforced by `pnpm check:deps` (scripts/check-dependency-whitelist.ts) instead.
-  // When oxlint gains `no-restricted-syntax`, move the ban here and delete the script's
-  // time-source section.
+  // NOTE on the `Date.now()` ban: oxlint 0.12 does not implement
+  // `no-restricted-syntax` or `no-restricted-properties`, and while
+  // `no-restricted-globals` is listed by `oxlint --rules` it is not implemented
+  // either (no checkmark). Verified empirically against oxlint 0.12.0: a file
+  // containing `Date.now()` produces 0 diagnostics under all three rules.
+  // `scripts/check-dependency-whitelist.ts`, which used to enforce this ban as
+  // part of `pnpm check:deps`, was removed org-wide (DEPENDENCY_POLICY.md /
+  // MIGRATION_RUNBOOK.md step 3): the Tier import boundary that script also
+  // enforced is now `no-restricted-imports` below, but this repository has no
+  // `@nerima-games/*` dependency to restrict (it is outside the 4-tier graph;
+  // see docs/architecture.md), so there is nothing to add there either. The
+  // `Date.now()` ban itself has no tooling replacement and is enforced by
+  // review only, same as every other org standard oxlint cannot yet express.
+  // When oxlint gains `no-restricted-syntax`, add the ban here.
   "env": {
     "es2022": true,
     "node": true
