@@ -37,7 +37,7 @@ const buildOrder: () => ReadonlyArray<string> | undefined   // undefined = 循�
 
 **これはロスターの参照コピーである。** 各リポジトリが `scripts/check-dependency-whitelist.ts`
 の中に手書きミラーを持つ方式は org 全体で廃止され、Tier 境界の検査は
-`oxlint.json#no-restricted-imports` に移った([architecture.md](./architecture.md) §3.1、
+`.oxlintrc.json#no-restricted-imports` に移った([architecture.md](./architecture.md) §3.1、
 DEPENDENCY_POLICY.md)。したがって現時点でこのロスターを読みに来る「ゲートのコピー」は
 他リポジトリ側には存在しない — このモジュールは mc-dev-meta 自身の `pnpm sync` /
 `pnpm update:manifest` / `pnpm check:workspace` / `pnpm check:mirrors` / `pnpm check:repoint`

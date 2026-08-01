@@ -74,7 +74,7 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 | `pnpm check:workspace` | clone 済みの各リポジトリで `pnpm verify` |
 | `pnpm check:workspace <script>` | 別のスクリプトを指定して横断実行 |
 | `pnpm typecheck` | `tsconfig.build.json`(純粋層)と `tsconfig.test.json`(scripts + tests)を型検査 |
-| `pnpm lint` | oxlint(このリポジトリ唯一の lint / format 設定)。**`--deny-warnings` 付きで走る**ため、`warn` のルールもビルドを落とす（`oxlint.json` は 5 カテゴリすべてと個別 67 ルールが `warn`、`error` は 4 つだけ。このフラグが無かった頃は実質その 4 つしかゲートになっていなかった） |
+| `pnpm lint` | oxlint(このリポジトリ唯一の lint / format 設定)。**`--deny-warnings` 付きで走る**ため、`warn` のルールもビルドを落とす（`.oxlintrc.json` は 5 カテゴリすべてと個別 67 ルールが `warn`、`error` は 4 つだけ。このフラグが無かった頃は実質その 4 つしかゲートになっていなかった） |
 | `pnpm test` | vitest(**プレーン vitest**。`@effect/vitest` は使わない — 依存ゼロのため) |
 | `pnpm test:coverage` | カバレッジ計測。4 指標 99% の閾値ゲート付き(下記「現状」参照) |
 | `pnpm check:mirrors` | 手書きミラー(`domain/kernel-vocabulary.ts` など)を**ミラー元リポジトリと突き合わせる**。下記 |
@@ -187,13 +187,13 @@ plan.md §6 Step 3:
 | `Date.now()` 禁止 | 時刻はすべて注入された Clock Port から取得する |
 
 **この表の Tier 境界(循環禁止・推移閉包の禁止・宣言と実体の一致・kernel 例外・
-mc-playground-kit の扱い)は、各リポジトリ own の `oxlint.json#no-restricted-imports`
+mc-playground-kit の扱い)は、各リポジトリ own の `.oxlintrc.json#no-restricted-imports`
 で検査する** (DEPENDENCY_POLICY.md)。各リポジトリが手書きの依存グラフを
 `scripts/check-dependency-whitelist.ts` として持つ方式は org 全体で廃止された。
 
 このリポジトリは **ロスターの参照コピー**(`domain/repository-roster.ts`)を持つ。
 mc-dev-meta は依存グラフの外(層外)にあり、`@nerima-games/*` を 1 つも import しないため、
-`oxlint.json#no-restricted-imports` に Tier 境界のエントリを持たない
+`.oxlintrc.json#no-restricted-imports` に Tier 境界のエントリを持たない
 (DEPENDENCY_POLICY.md「層外」)。
 
 ### `Date.now()` 禁止の実装方法

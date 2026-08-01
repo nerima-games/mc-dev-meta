@@ -20,7 +20,7 @@
 `test/check-dependency-whitelist.test.ts` と、それが検査していた
 `scripts/check-dependency-whitelist.ts` は org 全体で廃止された**
 (DEPENDENCY_POLICY.md、`pnpm check:deps` の撤去)。Tier 境界の検査は各リポジトリの
-`oxlint.json#no-restricted-imports` に移り、mc-dev-meta は層外でこのルールに
+`.oxlintrc.json#no-restricted-imports` に移り、mc-dev-meta は層外でこのルールに
 追加エントリを持たないため対応するテストも持たない。
 
 ## 2. プレーン vitest を使う

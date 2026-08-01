@@ -111,7 +111,7 @@ graph BT
 
 各リポジトリが `scripts/check-dependency-whitelist.ts` の中に、この依存グラフを
 手書きでミラーした写しを持つ方式は org 全体で廃止された。Tier 境界の検査は今、
-各リポジトリ自身の `oxlint.json#no-restricted-imports` が担う(DEPENDENCY_POLICY.md) —
+各リポジトリ自身の `.oxlintrc.json#no-restricted-imports` が担う(DEPENDENCY_POLICY.md) —
 つまり「グラフを手書きでミラーして、参照コピーとの一致を検査する」という設計そのものが
 このリポジトリの外では使われなくなった。
 
@@ -160,12 +160,12 @@ mc-dev-meta はこれに関与しない。
 
 各リポジトリ own の `scripts/check-dependency-whitelist.ts`(`pnpm check:deps`)が
 違反を非ゼロ終了で検査する方式は org 全体で廃止された。今は各リポジトリの
-`oxlint.json#no-restricted-imports` が Tier 境界を検査する(DEPENDENCY_POLICY.md)。
+`.oxlintrc.json#no-restricted-imports` が Tier 境界を検査する(DEPENDENCY_POLICY.md)。
 参照実装の `check-package-dag.ts` は警告を出して常に 0 で終了していた
 — 落ちないゲートはドキュメントであってゲートではない、という原則自体は変わらない。
 
 mc-dev-meta は依存グラフの外(層外)にあり、`@nerima-games/*` を 1 つも import しないため、
-`oxlint.json` に Tier 境界の追加エントリを持たない。「何も import していないこと」は
+`.oxlintrc.json` に Tier 境界の追加エントリを持たない。「何も import していないこと」は
 `test/workspace.test.ts` の `declares no runtime dependencies at all` が検査する。
 
 ## 5. 参照実装との対比

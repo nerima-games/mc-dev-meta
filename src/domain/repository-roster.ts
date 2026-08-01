@@ -15,7 +15,7 @@
  *
  * That script (and its per-repository copies) were retired org-wide
  * (DEPENDENCY_POLICY.md, API_STANDARD.md §4): the Tier import boundary is now
- * expressed per repository as `oxlint.json#no-restricted-imports`, not as a
+ * expressed per repository as `.oxlintrc.json#no-restricted-imports`, not as a
  * hand-copied graph object, so there is no longer a second copy to drift
  * against and check here.
  *
