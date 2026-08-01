@@ -16,9 +16,9 @@ import {
   type Manifest,
   type ManifestError,
   type Parsed,
-} from '../domain/manifest'
-import { MANAGED_REPOSITORY_NAMES } from '../domain/repository-roster'
-import { MANIFEST_FILENAME } from '../domain/workspace'
+} from '../src/domain/manifest'
+import { MANAGED_REPOSITORY_NAMES } from '../src/domain/repository-roster'
+import { MANIFEST_FILENAME } from '../src/domain/workspace'
 
 const SHA_A = 'a'.repeat(40)
 const SHA_B = '0123456789abcdef0123456789abcdef01234567'

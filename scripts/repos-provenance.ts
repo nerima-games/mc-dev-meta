@@ -26,10 +26,10 @@ import {
   isPinned,
   parseManifest,
   type Manifest,
-} from '../domain/manifest'
-import type { RepositoryProvenance } from '../domain/mirror-contract'
-import { isDestructiveGitCommand } from '../domain/sync-plan'
-import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../domain/workspace'
+} from '../src/domain/manifest'
+import type { RepositoryProvenance } from '../src/domain/mirror-contract'
+import { isDestructiveGitCommand } from '../src/domain/sync-plan'
+import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../src/domain/workspace'
 
 const execFileAsync = promisify(execFile)
 

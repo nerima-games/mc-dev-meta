@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { UNPINNED, type ManifestEntry } from '../domain/manifest'
+import { UNPINNED, type ManifestEntry } from '../src/domain/manifest'
 import {
   applyAction,
   DESTRUCTIVE_GIT_ARGUMENTS,
@@ -16,7 +16,7 @@ import {
   type SyncAction,
   type SyncMode,
   type WorkingCopyState,
-} from '../domain/sync-plan'
+} from '../src/domain/sync-plan'
 
 const SHA_A = 'a'.repeat(40)
 const SHA_B = 'b'.repeat(40)

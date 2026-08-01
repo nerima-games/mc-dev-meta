@@ -35,9 +35,13 @@ const defaultCloneUrl: (repositoryName) => string
 const buildOrder: () => ReadonlyArray<string> | undefined   // undefined = 循環あり
 ```
 
-**これはロスターの参照コピーである。** 他の 15 リポジトリは
-`scripts/check-dependency-whitelist.ts` の中にミラーを持つ
-([architecture.md](./architecture.md) §3.1)。
+**これはロスターの参照コピーである。** 各リポジトリが `scripts/check-dependency-whitelist.ts`
+の中に手書きミラーを持つ方式は org 全体で廃止され、Tier 境界の検査は
+`oxlint.json#no-restricted-imports` に移った([architecture.md](./architecture.md) §3.1、
+DEPENDENCY_POLICY.md)。したがって現時点でこのロスターを読みに来る「ゲートのコピー」は
+他リポジトリ側には存在しない — このモジュールは mc-dev-meta 自身の `pnpm sync` /
+`pnpm update:manifest` / `pnpm check:workspace` / `pnpm check:mirrors` / `pnpm check:repoint`
+が読む、内部利用の参照コピーである。
 
 `mc-kernel` はどの `dependsOn` にも現れない(どこからでも import 可のため)。
 `mc-playground-kit` はどの `dependsOn` にも現れない(devDependency 専用のため)。
@@ -195,34 +199,26 @@ const describeWorkspaceRun: (plan, command) => ReadonlyArray<string>
 
 | 未実装 | 備考 |
 | --- | --- |
-| ロスターの publish(他 15 リポジトリのゲートが consume する) | [architecture.md](./architecture.md) §3.1 |
+| ロスターの publish(consume する側は今のところ mc-dev-meta 自身のみ) | [architecture.md](./architecture.md) §3.1 |
 | `workspace:*` → pin 済みバージョンへの一括切り替え支援 | [versioning.md](./versioning.md) §3 |
-| API ロックの**集約**レポート | 各リポジトリのゲートは実装済み。`check:workspace` で一斉実行もできる。1 か所にまとめる仕組みだけが無い。下記 |
 | 並列 sync | 逐次で十分。出力の可読性を優先している |
 
-### API ロックの現状 — リポジトリ単位のゲートはある、集約はまだ
+### API ロック — 廃止済み(旧: 集約レポートが未実装だった機能)
 
-plan.md §9 の未決事項「API ロックファイルのツール選定（api-extractor 相当の Effect-TS 互換手段）」
-**そのものは決着した。** 16 リポジトリすべてが `api-lock.md` を持ち、
-生成器 `scripts/api-lock.ts` は `scripts/check-dependency-whitelist.ts` と同じく
-byte-identical で vendor されている（編集してよいのは `REPOSITORY_POLICY` だけ）。
-各リポジトリで `pnpm api:check` が `pnpm verify` の `check:deps` と `test` の間、
-および CI の `API lock` ステップとして走る。本リポジトリ自身もその 1 つである。
-理由と実測は mc-kernel の `docs/versioning.md` §7。
+このセクションはかつて、16 リポジトリすべてが持つ `api-lock.md` /
+`scripts/api-lock.ts` / `pnpm api:check` の「リポジトリ単位のゲートは実装済みだが、
+横断の集約レポートがまだ無い」という状態を記録していた。
 
-**横断の「実行」は既にできる。** `pnpm check:workspace` は clone 済みの各リポジトリで
-`pnpm verify` を回すので、その中で各リポジトリの `api:check` も回る
-（`scripts/check-workspace.ts` は走らせるスクリプト名を引数で受けるため、
-`pnpm check:workspace api:check` と絞ることもできる）。
+**その前提ごと廃止された。** `api-lock.md` という自動生成・自動検査の公開 API
+スナップショット機構は、org として撤去する決定がなされている(API_STANDARD.md §4)。
+`scripts/api-lock.ts` / `pnpm api:check` / `pnpm api:update` は全 16 リポジトリから、
+このリポジトリが持っていた横断ツール `scripts/check-api-lock-window.ts`
+(`pnpm check:api-window`、他 15 リポジトリの `api-lock.md` の鮮度を集計して報告していた)
+も同時に削除した。1.0.0 への昇格は、この節が記録していた「4 週間無変更」の自動計測ではなく、
+maintainer の裁量判断による([versioning.md](./versioning.md) §2、RELEASE_STANDARD.md §4)。
 
-**まだ無いのは「集約」のほうである。** `repos/` を横断して `api-lock.md` そのものを読み、
-鮮度や差分を 1 つのレポートにまとめる仕組みは無い。これは
-「ロスターの publish」（上記 1 行目）と同じ性質の課題である。
-集約が要る具体的な用件は 2 つ:
-
-- **plan.md §6 Step 3 の「4 週間無変更」の一覧。** 計測の起点は各リポジトリで
-  `api-lock.md` が最後に変わったコミットなので、機械的に集計できる。
-  どのリポジトリが publish 開始条件に近いかを 1 画面で見たい。
-- **vendor されたファイルの同一性。** `scripts/api-lock.ts` と `test/api-lock.test.ts` が
-  16 リポジトリで本当に byte-identical のままかは、横断でしか確かめられない。
-  `scripts/check-dependency-whitelist.ts` について同じ問題があるのと同型である。
+破壊的変更の判定は今後も人間のレビューで行う(API_STANDARD.md §3)。このリポジトリの
+`pnpm check:mirrors`(`domain/mirror-contract.ts` の型の形の比較)は、ミラー元リポジトリが
+`api-lock.md` をまだコミットしている間だけ機能する副次的な用途であり続けるが、
+それは今後段階的に skip へ収束していく想定の、経過的な依存である
+([README.md](../README.md)「`pnpm check:mirrors` — このリポジトリにしか置けない検査」§3)。

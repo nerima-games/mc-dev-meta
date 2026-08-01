@@ -308,12 +308,12 @@ export type RewriteResult = {
  * in the same word.
  *
  * KNOWN LIMIT, and it is a deliberate trade. This is a regex over text, not a
- * parse, for the same reason `scripts/check-dependency-whitelist.ts` is: the
- * gate must have no dependencies of its own. A DOC COMMENT containing the exact
- * bytes `from './frame-contract'` would be rewritten too. That is harmless —
- * a comment does not compile — and the alternative is carrying a TypeScript
- * parser to protect prose. Comments referring to the mirror in this
- * organisation are written with backticks around a bare path and do not match.
+ * parse, because the gate must have no dependencies of its own. A DOC COMMENT
+ * containing the exact bytes `from './frame-contract'` would be rewritten too.
+ * That is harmless — a comment does not compile — and the alternative is
+ * carrying a TypeScript parser to protect prose. Comments referring to the
+ * mirror in this organisation are written with backticks around a bare path
+ * and do not match.
  */
 export const rewriteMirrorImports = (
   text: string,

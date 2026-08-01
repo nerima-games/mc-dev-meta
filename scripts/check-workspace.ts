@@ -31,14 +31,14 @@ import {
   parseManifest,
   validateAgainstRoster,
   type Manifest,
-} from '../domain/manifest'
-import { MANAGED_REPOSITORY_NAMES } from '../domain/repository-roster'
+} from '../src/domain/manifest'
+import { MANAGED_REPOSITORY_NAMES } from '../src/domain/repository-roster'
 import {
   describeWorkspaceRun,
   MANIFEST_FILENAME,
   planWorkspaceRun,
   REPOS_DIRECTORY,
-} from '../domain/workspace'
+} from '../src/domain/workspace'
 
 const execFileAsync = promisify(execFile)
 const rootDir = process.cwd()

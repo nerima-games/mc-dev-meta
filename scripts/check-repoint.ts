@@ -101,7 +101,7 @@ import { execFile } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { describeProvenance } from '../domain/mirror-contract'
+import { describeProvenance } from '../src/domain/mirror-contract'
 import {
   classifyRepoint,
   describeRepointRun,
@@ -119,9 +119,9 @@ import {
   type ProjectResult,
   type RepointOutcome,
   type RepointSpec,
-} from '../domain/repoint-plan'
+} from '../src/domain/repoint-plan'
 import { loadManifest, provenanceOf } from './repos-provenance'
-import { REPOS_DIRECTORY } from '../domain/workspace'
+import { REPOS_DIRECTORY } from '../src/domain/workspace'
 
 const execFileAsync = promisify(execFile)
 

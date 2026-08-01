@@ -16,62 +16,25 @@
 
 ## 2. 他の 15 リポジトリの公開はいつ始まるのか
 
-### 2.1 開始条件は 1 つだけ
+### 2.1 かつての開始条件、そして今の開始条件
 
-plan.md §6 Step 0 item 2:
-
-> **npm 公開・バージョン bump 運用は界面安定(4 週間 API ロック無変更)まで開始しない**
-
-plan.md §6 Step 3:
+plan.md §6 Step 0 item 2 / §6 Step 3 は、当初こう定めていた:
 
 > 界面が安定した(**API ロック 4 週間無変更**)リポジトリから GitHub Packages 等へ npm 公開 +
 > changesets 運用に切り替え。それまでは dev-meta workspace 統合で開発
 
-つまり、あるリポジトリについて:
+**この「4 週間、api-lock.md が無変更」という日数計測ベースの自動ゲートは、org 全体で廃止された**
+(RELEASE_STANDARD.md §4.1)。`api-lock.md` というファイル自体も、それを検査していた
+`pnpm api:check` / `pnpm api:update` も、全 16 リポジトリから撤去されている(API_STANDARD.md §4)。
+このリポジトリが持っていた `scripts/check-api-lock-window.ts`(`pnpm check:api-window`)—
+他 15 リポジトリの `api-lock.md` の鮮度・経過日数を横断で報告するツール — も、
+測る対象そのものが無くなったため同時に削除した。
 
-1. そのリポジトリの公開 API レポート(API ロックファイル)が
-2. **4 週間、1 度も変更されていない**
-
-これを満たしたとき、そのリポジトリだけが publish 運用に移る。
-途中で 1 行でも変わったら、4 週間は**そこから数え直し**である。
-
-**この「API ロックファイル」は 16 リポジトリすべてに実在する。**
-各リポジトリ直下の `api-lock.md` がそれで、`pnpm api:check` が `pnpm verify` と CI の両方で
-鮮度を検査する（[public-api.md](./public-api.md) §5）。
-したがって上の条件は主観ではなく、`api-lock.md` が最後に変わったコミットの日付を見れば決まる。
-`pnpm check:workspace` で 16 リポジトリぶんのゲートを一斉に回すこともできる。
-
-### 経過日数は `pnpm check:api-window` が答える
-
-条件の前半（レポートが実際の API と一致しているか）は各リポジトリの `pnpm api:check` が
-強制していたが、**後半の「4 週間」は誰も測っていなかった**。plan.md の一文であり、
-答えるには 15 箇所で `git log` を打って日付を手で引き算する必要があった。
-**評価できない条件は条件ではない。**
-
-```console
-$ pnpm check:api-window
-  mc-kernel: waiting — 0 days unchanged, 28 to go.
-  ...
-api-lock window: 0 stable, 15 waiting, 0 unknown (of 15).
-```
-
-起点は**記録せず導出している** —— `git log -1 -- api-lock.md` である。この選択には
-手で日付を書く方式に無い性質が 2 つある。記述対象と乖離しようがないこと、そして
-**API を変えれば起点が自動的に巻き戻る**こと。後者は「4 週間無変更」の意味そのものである。
-
-判定は `domain/api-lock-window.ts` にあり、`now` を引数に取る。組織全体の `Date.now()` 禁止
-（plan.md §4.3）はこのためにある —— 自分で時計を読む関数は、答えがたまたま正しい瞬間にしか
-テストできない。引数にしたことで 27 日と 28 日の境界が通常のテストケースになっている。
-
-**このコマンドは何もゲートしない。** `pnpm verify` にも入れていない。
-publish は意図的な行為であって時計が引き起こすものではないし、3 日足りないという理由で
-CI を落とすのは、報告ではなくスケジュールの強制である。
-`verify` は「正しいか」に、これは「どれだけ古いか」に答える。
-
-なお `unknown`（clone されていない等）は `waiting` に畳まない。
-何も言っていないリポジトリを「未達」として報告するのは、ステータスボードが嘘をつき始める入口である。
-ただし**その結果を 1 つのレポートに集約する仕組みはまだ無い**
-（どのリポジトリが 4 週間に近いかの一覧は、今は手で数える）。
+**新しい昇格ポリシーは、日数や指標による自動ゲートではなく、maintainer(take)による裁量判断**
+である(RELEASE_STANDARD.md §4.2)。判断材料は都度異なってよく、事前にすべて明文化することは
+求めない。実質的なトリガーは「上位階層(依存する側)が実際にそのパッケージを消費し、動作確認を
+終えたこと」だが、それをもって自動的に 1.0.0 へ上がるわけではなく、maintainer がその確認結果を
+踏まえて 1.0.0 昇格の changeset(`major` bump)を書く、という運びになる。
 
 ### 2.2 なぜ遅らせるのか
 
@@ -161,7 +124,7 @@ publish が始まっても `repos.json` は SHA を記録し続ける。
 個々のリポジトリの完成条件は各リポジトリの `docs/versioning.md` にあるが、共通するのは:
 
 1. **下流が実際に消費して契約を確認した**
-2. **API ロック 4 週間無変更**(plan.md §6 Step 3)
+2. **1.0.0 昇格は maintainer の裁量判断による**(日数や指標による自動ゲートは廃止。RELEASE_STANDARD.md §4)
 3. **参照実装のテスト資産の移植が完了**
 4. **ビルド / publish パイプラインが存在する**
 5. **カバレッジ 99% ゲートが有効**
@@ -171,16 +134,13 @@ mc-dev-meta 自身にはこれらが適用されない。publish されないた
 
 > **空の `repos/` でも 15 個そろった `repos/` でも、全コマンドが正しく動く。**
 
-## 6. changesets はいつ入るのか
+## 6. changesets — 決定済み、mc-dev-meta は対象外
 
-plan.md §6 Step 3 は publish 開始時に changesets 運用へ切り替えるとしている。
+**決着した。** `mc-dev-meta` を除く 15 リポジトリが、それぞれ独立に
+`@changesets/cli` を導入する(RELEASE_STANDARD.md §1)。以前ここに書かれていた
+「mc-dev-meta が `repos/*` workspace 全体に対して changesets を回す」という案は採用されなかった —
+publish 権限を 1 か所に集める必要も、モノレポの体験を模す必要もなかったためである。
 
-changesets は monorepo 前提のツールなので、16 リポジトリに散らばった状態でどう使うかは
-**未決**である。候補:
-
-1. 各リポジトリが独立して changesets を持つ(最も素直。連鎖の自動化は無い)
-2. mc-dev-meta が `repos/*` workspace 全体に対して changesets を回す
-   (モノレポと同じ体験。ただし publish 権限をここに集めることになる)
-
-plan.md §9「未決事項」の「パッケージ公開先(GitHub Packages / private registry)」と
-併せて、最初のリポジトリが 4 週間 API ロックを達成した時点で決める。
+**mc-dev-meta 自身には changesets を導入しない。** `private: true`、`publishConfig` 無し、
+永久に publish されない(本書 §1)ため、バージョン bump も CHANGELOG 生成も対象がない。
+`.changeset/` ディレクトリも `@changesets/cli` への devDependency もこのリポジトリには存在しない。

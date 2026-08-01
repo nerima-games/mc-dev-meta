@@ -19,7 +19,7 @@ import {
   publishedNames,
   typesInApiLock,
   type TypeShape,
-} from '../domain/type-shape'
+} from '../src/domain/type-shape'
 
 const shapeOf = (text: string, name: string): TypeShape => {
   const parsed = declaredTypes(text)
