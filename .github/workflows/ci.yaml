@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "pnpm"
           # pnpm-lock.yaml is gitignored — see .gitignore for why a
           # workspace-root lockfile describing gitignored packages is not a
@@ -44,7 +44,7 @@ jobs:
           cache-dependency-path: package.json
 
       - name: Install dependencies
-        # --ignore-scripts: pnpm runs postinstall, and a fork PR can edit
+        # --ignore-scripts: pnpm 9 runs postinstall, and a fork PR can edit
         # package.json and the lockfile consistently and still satisfy
         # --frozen-lockfile. Nothing here needs a lifecycle script. This is the
         # check that actually protects the runner, and it is unaffected by the
@@ -64,18 +64,8 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
-      # oxlint is provided by the Nix devShell (flake.nix), not a package.json
-      # devDependency — see flake.nix's comment on why. Installing Nix just for
-      # this one step is the trade-off: one pinned oxlint version instead of
-      # each repository independently drifting on its own npm-resolved version.
-      - name: Set up Nix
-        uses: ./.github/actions/nix-setup
-        with:
-          cachix-cache: ${{ vars.CACHIX_CACHE }}
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
       - name: Lint
-        run: nix develop --command pnpm lint
+        run: pnpm lint
 
       - name: Test
         run: pnpm test
