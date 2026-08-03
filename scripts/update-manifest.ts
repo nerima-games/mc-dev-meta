@@ -71,17 +71,17 @@ import {
   validateAgainstRoster,
   withPinnedRef,
   type Manifest,
-} from '../domain/manifest'
+} from '../src/domain/manifest'
 import {
   describePinDecision,
   planPin,
   summarisePins,
   type PinDecision,
   type PinObservation,
-} from '../domain/pin-plan'
-import { MANAGED_REPOSITORY_NAMES } from '../domain/repository-roster'
-import { isDestructiveGitCommand, type RemoteObservation, type SyncMode } from '../domain/sync-plan'
-import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../domain/workspace'
+} from '../src/domain/pin-plan'
+import { MANAGED_REPOSITORY_NAMES } from '../src/domain/repository-roster'
+import { isDestructiveGitCommand, type RemoteObservation, type SyncMode } from '../src/domain/sync-plan'
+import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../src/domain/workspace'
 
 const execFileAsync = promisify(execFile)
 const rootDir = process.cwd()

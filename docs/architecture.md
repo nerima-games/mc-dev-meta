@@ -74,16 +74,15 @@ graph BT
 ```
 
 > **mc-kernel は全リポジトリから import 可能。** グラフに描かないのは、
-> 全ノードから kernel へエッジを引くと図が読めなくなるためと、
-> `scripts/check-dependency-whitelist.ts` が `dependencyGraph` に kernel を書くことを
-> 設定エラーとして拒否するため(rule 4)。ただし `package.json` への記載は必要。
+> 全ノードから kernel へエッジを引くと図が読めなくなるためである。ただし
+> `package.json` への記載は必要。この例外はロスター(`KERNEL_REPOSITORY`)にも表れる:
+> どの `dependsOn` にも kernel を含めない、という形で宣言している。
 
 このグラフは `domain/repository-roster.ts` の `DEPENDENCY_GRAPH` として機械可読な形で入っており、
 `test/roster.test.ts` が
 
 - 循環が無いこと(ビルド順が存在すること)
 - ビルド順が plan.md §6 Step 2 と一致すること
-- **本リポジトリの `scripts/check-dependency-whitelist.ts` のコピーと辺単位で一致すること**
 
 を検証している。
 
@@ -109,15 +108,18 @@ graph BT
 — それを clone し、workspace として束ねるのが仕事だからである。
 
 そこで `domain/repository-roster.ts` が**ロスターの参照コピー**を持つ。
-他の 15 リポジトリはこれをミラーした写しを
-`scripts/check-dependency-whitelist.ts` の中に持っている
-(ゲートはネットワークも兄弟リポジトリも無い状態で動く必要があるため)。
 
-`test/roster.test.ts` の `the roster and the dependency gate agree` が、
-**このリポジトリ内では**両者が一致することを保証する。
-他の 15 リポジトリとの一致は依然として手作業であり、
-最終的にはこのモジュールを publish して各ゲートが consume するのが答えである
-([workflow.md](./workflow.md) §5.4)。
+各リポジトリが `scripts/check-dependency-whitelist.ts` の中に、この依存グラフを
+手書きでミラーした写しを持つ方式は org 全体で廃止された。Tier 境界の検査は今、
+各リポジトリ自身の `.oxlintrc.json#no-restricted-imports` が担う(DEPENDENCY_POLICY.md) —
+つまり「グラフを手書きでミラーして、参照コピーとの一致を検査する」という設計そのものが
+このリポジトリの外では使われなくなった。
+
+`domain/repository-roster.ts` は mc-dev-meta 自身の `pnpm sync` / `pnpm update:manifest` /
+`pnpm check:workspace` / `pnpm check:mirrors` / `pnpm check:repoint` が読む内部の参照コピーとして
+残る。他の 15 リポジトリへ配布・consume させる計画([workflow.md](./workflow.md) §5.4 が
+記録していたもの)は、ミラー先だった `scripts/check-dependency-whitelist.ts` 自体が
+無くなったことで前提が変わっており、現時点では未定である。
 
 ## 4. 設計ルール(16 リポジトリ共通)
 
@@ -154,13 +156,17 @@ kit を実行時依存にすると、出荷ビルドが「同梱されないハ�
 各モジュールは `after` で順序制約を宣言するだけで、全順序は mc-compose が解決する。
 mc-dev-meta はこれに関与しない。
 
-### 4.4 依存ホワイトリストは CI で強制(plan.md §2.3-5)
+### 4.4 依存境界は CI で強制(plan.md §2.3-5)
 
-`pnpm check:deps` は違反があれば必ず非ゼロ終了する。
+各リポジトリ own の `scripts/check-dependency-whitelist.ts`(`pnpm check:deps`)が
+違反を非ゼロ終了で検査する方式は org 全体で廃止された。今は各リポジトリの
+`.oxlintrc.json#no-restricted-imports` が Tier 境界を検査する(DEPENDENCY_POLICY.md)。
 参照実装の `check-package-dag.ts` は警告を出して常に 0 で終了していた
-— 落ちないゲートはドキュメントであってゲートではない。
+— 落ちないゲートはドキュメントであってゲートではない、という原則自体は変わらない。
 
-mc-dev-meta にとってこのゲートは「何も import していないこと」の検査である。
+mc-dev-meta は依存グラフの外(層外)にあり、`@nerima-games/*` を 1 つも import しないため、
+`.oxlintrc.json` に Tier 境界の追加エントリを持たない。「何も import していないこと」は
+`test/workspace.test.ts` の `declares no runtime dependencies at all` が検査する。
 
 ## 5. 参照実装との対比
 

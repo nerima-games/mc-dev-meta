@@ -40,8 +40,8 @@ import {
   type RepositoryProvenance,
   type SourceObservation,
   type ValueObservation,
-} from '../domain/mirror-contract'
-import type { TypeShape } from '../domain/type-shape'
+} from '../src/domain/mirror-contract'
+import type { TypeShape } from '../src/domain/type-shape'
 
 // ---------------------------------------------------------------------------
 // Fixtures

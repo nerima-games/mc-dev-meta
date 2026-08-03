@@ -30,7 +30,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       enabled: false,
-      include: ['index.ts', 'domain/**/*.ts'],
+      include: ['src/index.ts', 'src/domain/**/*.ts'],
       // scripts/ is deliberately NOT covered: it is the impure shell, and the
       // only way to cover it would be to run real git against real
       // repositories. Its decisions live in domain/ and are covered there.
@@ -38,18 +38,18 @@ export default defineConfig({
       all: true,
       reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
-      // NO THRESHOLD YET — deliberate.
+      // TEST_STANDARD.md §3: the 4-metric 99% gate is an org-wide decision
+      // applied immediately to all 16 repositories, with no staged rollout and
+      // no per-repository exemption for being "not done yet" — a low number is
+      // a reason for CI to go red, not a reason to withhold the gate.
       //
-      // The reference repository (takeokunn/ts-minecraft) enforces 99% on
-      // branches/functions/lines/statements. A threshold on a skeleton would be
-      // meaningless: it would be trivially satisfied by a handful of type-only
-      // modules and would say nothing about the real implementation.
-      //
-      // Coverage is collected and reported (`pnpm test:coverage`) so the number
-      // is always visible. The 99% gate is turned on — here and in the CI
-      // workflow — when this repository reaches its completion criteria.
-      //
-      //   thresholds: { branches: 99, functions: 99, lines: 99, statements: 99 },
+      // Measured at migration time (`pnpm test:coverage`): statements 93.78%,
+      // branches 89.19%, functions 97.82%, lines 93.78%. This does NOT clear
+      // 99% on 3 of the 4 metrics, so enabling this turns CI red here, the same
+      // known-and-accepted way it does for mc-audio / mc-compose /
+      // mc-playground-kit (TEST_STANDARD.md §4). That is expected, not a
+      // reason to defer.
+      thresholds: { branches: 99, functions: 99, lines: 99, statements: 99 },
     },
   },
   esbuild: {

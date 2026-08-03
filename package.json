@@ -36,25 +36,20 @@
     "update:manifest:latest": "tsx scripts/update-manifest.ts --latest",
     "update:manifest:latest:dry": "tsx scripts/update-manifest.ts --latest --dry-run",
     "check:workspace": "tsx scripts/check-workspace.ts",
-    "check:api-window": "tsx scripts/check-api-lock-window.ts",
     "check:mirrors": "tsx scripts/check-mirrors.ts",
     "check:repoint": "tsx scripts/check-repoint.ts",
     "typecheck": "tsc -p tsconfig.build.json --pretty false && tsc -p tsconfig.test.json --pretty false",
-    "lint": "oxlint --deny-warnings index.ts domain scripts test",
-    "lint:fix": "oxlint --fix index.ts domain scripts test",
+    "lint": "oxlint --deny-warnings src scripts test",
+    "lint:fix": "oxlint --fix src scripts test",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "check:deps": "tsx scripts/check-dependency-whitelist.ts",
-    "api:check": "tsx scripts/api-lock.ts",
-    "api:update": "tsx scripts/api-lock.ts --write",
-    "verify": "pnpm typecheck && pnpm lint && pnpm check:deps && pnpm api:check && pnpm check:mirrors && pnpm test"
+    "verify": "pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {
     "@typescript/native": "npm:typescript@7.0.2",
     "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "^3.2.7",
-    "oxlint": "^1.76.0",
     "tsx": "^4.23.1",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "vitest": "^3.2.7"

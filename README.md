@@ -43,8 +43,8 @@ plan.md §6 Step 0 item 2:
 ## クイックスタート
 
 ```console
-$ direnv allow          # flake.nix の devShell で nodejs_24 + corepack が入る
-$ pnpm install          # このリポジトリ自身の devDependencies
+$ direnv allow          # flake.nix の devShell で nodejs_24 + corepack + oxlint が入る
+$ pnpm install          # このリポジトリ自身の devDependencies (oxlint は上記 devShell 由来)
 $ pnpm sync             # 15 リポジトリを repos/ へ clone
 $ pnpm install          # ここで repos/* が workspace として解決される
 ```
@@ -75,16 +75,12 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 | `pnpm update:manifest:latest:dry` | 同上。何も書かない |
 | `pnpm check:workspace` | clone 済みの各リポジトリで `pnpm verify` |
 | `pnpm check:workspace <script>` | 別のスクリプトを指定して横断実行 |
-| `pnpm check:api-window` | 各リポジトリの API が何日変わっていないかを報告（plan.md §6 Step 3 の 4 週間） |
 | `pnpm typecheck` | `tsconfig.build.json`(純粋層)と `tsconfig.test.json`(scripts + tests)を型検査 |
-| `pnpm lint` | oxlint(このリポジトリ唯一の lint / format 設定)。**`--deny-warnings` 付きで走る**ため、`warn` のルールもビルドを落とす（`oxlint.json` は 5 カテゴリすべてと個別 67 ルールが `warn`、`error` は 4 つだけ。このフラグが無かった頃は実質その 4 つしかゲートになっていなかった） |
+| `pnpm lint` | oxlint(このリポジトリ唯一の lint / format 設定)。**`--deny-warnings` 付きで走る**ため、`warn` のルールもビルドを落とす（`.oxlintrc.json` は 5 カテゴリすべてと個別 67 ルールが `warn`、`error` は 4 つだけ。このフラグが無かった頃は実質その 4 つしかゲートになっていなかった） |
 | `pnpm test` | vitest(**プレーン vitest**。`@effect/vitest` は使わない — 依存ゼロのため) |
-| `pnpm test:coverage` | カバレッジ計測(閾値は未設定) |
-| `pnpm check:deps` | 依存ホワイトリスト + 循環検査 + `Date.now()` 禁止の検査 |
-| `pnpm api:check` | `api-lock.md` が実際の公開 API と食い違えば非ゼロ終了（[`docs/public-api.md`](./docs/public-api.md) §5） |
-| `pnpm api:update` | `api-lock.md` を書き直す。公開面を変える PR は結果を同じ PR に含める |
+| `pnpm test:coverage` | カバレッジ計測。4 指標 99% の閾値ゲート付き(下記「現状」参照) |
 | `pnpm check:mirrors` | 手書きミラー(`domain/kernel-vocabulary.ts` など)を**ミラー元リポジトリと突き合わせる**。下記 |
-| `pnpm verify` | `typecheck && lint && check:deps && api:check && check:mirrors && test`。CI と同じ内容 |
+| `pnpm verify` | `typecheck && lint && test`。CI と同じ内容。`check:mirrors` は CI では別ステップとして走る(TEST_STANDARD.md §1) |
 
 **`pnpm verify` は `repos/` が空でも通る。** これは配慮ではなく責務である
 — 15 リポジトリを取ってくるツールが、最後に信用できるようになるものであってはならない。
@@ -116,8 +112,13 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 2. **タグキー** — 同じく import して `.key` を比較する。Effect はこの文字列で解決するので、
    食い違った 2 つは実行時に別サービス・型検査は両方通る。
 3. **型の形** — 型は実行時に存在しないので、ミラー元の**コミット済み `api-lock.md`**
-   (tsc の declaration emit で生成され、`pnpm api:check` が鮮度を保証している)と
-   ミラーのソースを、同じパーサで読む。比較するのは**メンバ名・省略可否・union の arm** で、
+   (tsc の declaration emit で生成されていた)とミラーのソースを、同じパーサで読む。
+   `api-lock.md` とそれを生成・検査していた `pnpm api:check` は org 全体で廃止された
+   (API_STANDARD.md §4)。**このリポジトリの `pnpm check:mirrors` はミラー元が
+   `api-lock.md` をコミットしていることを前提に組まれているため**、ミラー元リポジトリの
+   移行で同ファイルが削除されると、その 1 スペックは(値・タグキーの比較も含めて)
+   まるごと `skip`(理由付き)として報告されるようになる。`repos/` が空・部分的なときと
+   同じ扱いであり、CI を落とさない。比較するのは**メンバ名・省略可否・union の arm** で、
    **メンバの型は比較しない** — ミラーは意図的にそこで乖離しており
    (`biomes: ReadonlyArray<string>`、unbranded な `BlockId`)、既知の差分で埋まった
    レポートは誰も読まなくなるからである。
@@ -187,18 +188,24 @@ plan.md §6 Step 3:
 | mc-playground-kit は devDependency 専用 | `dependencies` に入れてはならない。実行時依存になると、出荷ビルドから入力処理が消える |
 | `Date.now()` 禁止 | 時刻はすべて注入された Clock Port から取得する |
 
+**この表の Tier 境界(循環禁止・推移閉包の禁止・宣言と実体の一致・kernel 例外・
+mc-playground-kit の扱い)は、各リポジトリ own の `.oxlintrc.json#no-restricted-imports`
+で検査する** (DEPENDENCY_POLICY.md)。各リポジトリが手書きの依存グラフを
+`scripts/check-dependency-whitelist.ts` として持つ方式は org 全体で廃止された。
+
 このリポジトリは **ロスターの参照コピー**(`domain/repository-roster.ts`)を持つ。
-他の 15 リポジトリは `scripts/check-dependency-whitelist.ts` の中にミラーを持っており、
-`test/roster.test.ts` が**このリポジトリ内での**両者の一致を保証している。
+mc-dev-meta は依存グラフの外(層外)にあり、`@nerima-games/*` を 1 つも import しないため、
+`.oxlintrc.json#no-restricted-imports` に Tier 境界のエントリを持たない
+(DEPENDENCY_POLICY.md「層外」)。
 
 ### `Date.now()` 禁止の実装方法
 
 oxlint 0.12 は `no-restricted-syntax` も `no-restricted-properties` も実装しておらず、
 `no-restricted-globals` は `oxlint --rules` の一覧に出るものの実装されていない(0.12.0 で実測確認済み)。
 
-そのため禁止は **`scripts/check-dependency-whitelist.ts` 側で実装**している。
-対象は `Date.now()` / `new Date()` / `performance.now()` の 3 つ。
-コメント・文字列リテラル・正規表現リテラルの中身はマスクされるので誤検知しない。
+この禁止をかつて実装していた `scripts/check-dependency-whitelist.ts` は org 全体で廃止された
+(DEPENDENCY_POLICY.md)。ツールによる代替の強制は無く、レビューのみで守る
+(oxlint がこの種の禁止を実装した時点でここに追加する)。
 
 ## 現状
 
@@ -214,8 +221,14 @@ oxlint 0.12 は `no-restricted-syntax` も `no-restricted-properties` も実装�
   6 リポジトリに push しても**両コマンドとも成功を報告して何もしなかった**。
   `--latest` がこれを破る。詳細は [docs/manifest.md](./docs/manifest.md) §5
 - **ロスターの publish は未実装。** 現在は 16 リポジトリが手作業でミラーしている
-- **changesets 運用は未決**(plan.md §9 の「パッケージ公開先」も未決)
-- **カバレッジ閾値は未設定。** 99% ゲートは完成条件到達時に有効化する
+- **changesets は対象外。** `private: true`、永久に publish されない
+  ([RELEASE_STANDARD.md §0](https://github.com/nerima-games/.github/blob/main/RELEASE_STANDARD.md))
+- **カバレッジ 4 指標 99% ゲートは有効。** TEST_STANDARD.md §3 の org 決定により、
+  猶予期間なしで有効化した。移行時点の実測(`pnpm test:coverage`)は
+  statements 93.78% / branches 89.19% / functions 97.82% / lines 93.78% で、
+  4 指標中 3 指標が未達 —— したがって **CI はこのゲートで赤くなる**。これは想定内であり
+  (TEST_STANDARD.md §4 が mc-audio / mc-compose / mc-playground-kit を同様に扱う)、
+  ゲートを緩める理由にはしない
 
 > **注意**: ツールチェーンは `devenv.nix` から `flake.nix` + `flake.lock` に移行済みである。
 > `flake.lock` はコミットされているので、`nix develop`（`.envrc` は `use flake`）は

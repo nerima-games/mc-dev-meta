@@ -1,15 +1,15 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { parseManifest, UNPINNED, type Manifest } from '../domain/manifest'
-import { MANAGED_REPOSITORY_NAMES } from '../domain/repository-roster'
+import { parseManifest, UNPINNED, type Manifest } from '../src/domain/manifest'
+import { MANAGED_REPOSITORY_NAMES } from '../src/domain/repository-roster'
 import {
   describeWorkspaceRun,
   MANIFEST_FILENAME,
   planWorkspaceRun,
   REPOS_DIRECTORY,
   WORKSPACE_PACKAGES_GLOB,
-} from '../domain/workspace'
+} from '../src/domain/workspace'
 
 const SHA = 'a'.repeat(40)
 

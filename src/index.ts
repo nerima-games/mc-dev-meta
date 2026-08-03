@@ -32,10 +32,10 @@ export * from './domain/repository-roster'
 export * from './domain/sync-plan'
 export * from './domain/workspace'
 
-// NOT re-exported, deliberately, and for the same reason `domain/api-lock-window.ts`
-// is not: this barrel is the WORKSPACE BINDER's surface (docs/public-api.md), and
-// `domain/mirror-contract.ts` + `domain/type-shape.ts` are the decision layer of a
-// CHECK — `pnpm check:mirrors`. They are typechecked by tsconfig.build.json and
-// unit-tested like everything else in domain/; they are simply not part of what
-// this package would offer a consumer if it were ever published.
+// NOT re-exported, deliberately: this barrel is the WORKSPACE BINDER's surface
+// (docs/public-api.md), and `domain/mirror-contract.ts` + `domain/type-shape.ts`
+// are the decision layer of a CHECK — `pnpm check:mirrors`. They are typechecked
+// by tsconfig.build.json and unit-tested like everything else in domain/; they
+// are simply not part of what this package would offer a consumer if it were
+// ever published.
 

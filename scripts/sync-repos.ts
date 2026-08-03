@@ -83,8 +83,8 @@ import {
   validateAgainstRoster,
   type Manifest,
   type ManifestEntry,
-} from '../domain/manifest'
-import { MANAGED_REPOSITORY_NAMES } from '../domain/repository-roster'
+} from '../src/domain/manifest'
+import { MANAGED_REPOSITORY_NAMES } from '../src/domain/repository-roster'
 import {
   describeAction,
   fetchesFromRemote,
@@ -97,8 +97,8 @@ import {
   type SyncAction,
   type SyncMode,
   type WorkingCopyState,
-} from '../domain/sync-plan'
-import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../domain/workspace'
+} from '../src/domain/sync-plan'
+import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../src/domain/workspace'
 
 const execFileAsync = promisify(execFile)
 

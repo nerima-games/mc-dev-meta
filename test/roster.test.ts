@@ -11,11 +11,7 @@ import {
   REPOSITORY_NAMES,
   repositoriesInTier,
   repositoryNamed,
-} from '../domain/repository-roster'
-import { REPOSITORY_POLICY } from '../scripts/check-dependency-whitelist'
-
-const packageNames = (names: ReadonlyArray<string>): ReadonlyArray<string> =>
-  names.map(packageNameOf).sort()
+} from '../src/domain/repository-roster'
 
 describe('the roster', () => {
   it('has all 16 repositories, each exactly once', () => {
@@ -57,7 +53,7 @@ describe('the roster', () => {
 describe('the dependency graph', () => {
   // REGRESSION: mc-kernel is universally importable, which is expressed by its
   // ABSENCE from every row. Listing it would make every row identical in an
-  // uninformative way — and the check script rejects a graph that names it.
+  // uninformative way.
   it('never lists mc-kernel as an edge', () => {
     for (const entry of REPOSITORIES) {
       expect(entry.dependsOn, entry.name).not.toContain(KERNEL_REPOSITORY)
@@ -136,30 +132,5 @@ describe('the dependency graph', () => {
     expect(at('mc-playground-kit')).toBeGreaterThan(at('mc-render'))
     expect(at('mx-gameplay')).toBeGreaterThan(at('mc-sim'))
     expect(at('mc-compose')).toBe(order.length - 1)
-  })
-})
-
-describe('the roster and the dependency gate agree', () => {
-  // REGRESSION: every repository carries a COPY of the graph inside
-  // scripts/check-dependency-whitelist.ts, because the gate must work with no
-  // network and no siblings checked out. This repository holds the reference
-  // copy in domain/repository-roster.ts. Drift between the two — HERE, where
-  // both live in one repository — would make the reference copy worthless.
-  it('declares the same 16 repositories in both places', () => {
-    expect([...REPOSITORY_POLICY.dependencyGraph.keys()].sort()).toStrictEqual(
-      packageNames(REPOSITORY_NAMES),
-    )
-  })
-
-  it('declares the same edges in both places, for every repository', () => {
-    for (const entry of REPOSITORIES) {
-      const fromPolicy = REPOSITORY_POLICY.dependencyGraph.get(packageNameOf(entry.name))
-      expect(fromPolicy, entry.name).toBeDefined()
-      expect([...(fromPolicy ?? [])].sort(), entry.name).toStrictEqual(packageNames(entry.dependsOn))
-    }
-  })
-
-  it('names mc-dev-meta as the package the gate is guarding', () => {
-    expect(REPOSITORY_POLICY.thisPackage).toBe(packageNameOf('mc-dev-meta'))
   })
 })

@@ -7,7 +7,7 @@
   // Everything that touches the outside world lives in `scripts/` and is
   // checked by tsconfig.test.json, where `types: ["node"]` is available.
   "extends": "./tsconfig.base.json",
-  "include": ["index.ts", "domain/**/*.ts"],
+  "include": ["src/index.ts", "src/domain/**/*.ts"],
   "exclude": [
     "node_modules",
     "repos",

@@ -117,16 +117,16 @@ import {
   type SourceObservation,
   type TranscribedColumn,
   type ValueObservation,
-} from '../domain/mirror-contract'
+} from '../src/domain/mirror-contract'
 import { loadManifest, provenanceOf } from './repos-provenance'
-import { REPOS_DIRECTORY } from '../domain/workspace'
+import { REPOS_DIRECTORY } from '../src/domain/workspace'
 import {
   declaredTypes,
   describeShapeError,
   publishedNames,
   typesInApiLock,
   type TypeShape,
-} from '../domain/type-shape'
+} from '../src/domain/type-shape'
 
 const rootDir = process.cwd()
 
