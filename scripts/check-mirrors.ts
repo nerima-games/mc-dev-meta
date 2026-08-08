@@ -130,6 +130,15 @@ import {
 
 const rootDir = process.cwd()
 
+/** This is a CLI script; stdout/stderr ARE its output, not debug noise. */
+const print = (line: string): void => {
+  process.stdout.write(`${line}\n`)
+}
+
+const printError = (line: string): void => {
+  process.stderr.write(`${line}\n`)
+}
+
 /** The committed API lock, at each repository's root. Same name in all sixteen. */
 const API_LOCK_FILENAME = 'api-lock.md'
 
@@ -652,9 +661,9 @@ export const main = async (): Promise<number> => {
     await loadManifest(rootDir, 'check:mirrors'),
   )
   for (const line of describeProvenance(provenance)) {
-    console.log(line)
+    print(line)
   }
-  console.log('')
+  print('')
 
   // Sequential rather than `Promise.all`: the imports share a module cache and
   // the report has to come out in MIRROR_SPECS order for a diff of two runs to
@@ -683,7 +692,7 @@ export const main = async (): Promise<number> => {
         continue
       }
       for (const finding of outcome.findings) {
-        console.log(`FINGERPRINT ${fingerprintFinding(outcome.spec, finding)}`)
+        print(`FINGERPRINT ${fingerprintFinding(outcome.spec, finding)}`)
       }
     }
   }
@@ -692,9 +701,9 @@ export const main = async (): Promise<number> => {
   const report = describeMirrorRun(outcomes)
   for (const line of report) {
     if (exitCode === 0) {
-      console.log(line)
+      print(line)
     } else {
-      console.error(line)
+      printError(line)
     }
   }
 
@@ -708,7 +717,7 @@ const isDirectRun = (): boolean => {
 
 if (isDirectRun()) {
   const code = await main().catch((cause: unknown) => {
-    console.error(`check:mirrors: ${cause instanceof Error ? cause.message : String(cause)}`)
+    printError(`check:mirrors: ${cause instanceof Error ? cause.message : String(cause)}`)
     return 1
   })
   process.exit(code)

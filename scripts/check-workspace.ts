@@ -43,25 +43,34 @@ import {
 const execFileAsync = promisify(execFile)
 const rootDir = process.cwd()
 
+/** This is a CLI script; stdout/stderr ARE its output, not debug noise. */
+const print = (line: string): void => {
+  process.stdout.write(`${line}\n`)
+}
+
+const printError = (line: string): void => {
+  process.stderr.write(`${line}\n`)
+}
+
 /** Positional arguments only; anything starting with `-` is not a script name. */
 const requestedScript = process.argv.slice(2).find((argument) => !argument.startsWith('-')) ?? 'verify'
 
 const loadManifest = async (): Promise<Manifest | undefined> => {
   const raw = await readFile(path.join(rootDir, MANIFEST_FILENAME), 'utf8').catch(() => undefined)
   if (raw === undefined) {
-    console.error(`check:workspace: cannot read ${MANIFEST_FILENAME}.`)
+    printError(`check:workspace: cannot read ${MANIFEST_FILENAME}.`)
     return undefined
   }
 
   const parsed = parseManifest(raw)
   if (!parsed.ok) {
-    console.error(`check:workspace: ${describeManifestError(parsed.error)}`)
+    printError(`check:workspace: ${describeManifestError(parsed.error)}`)
     return undefined
   }
 
   const validated = validateAgainstRoster(parsed.value, MANAGED_REPOSITORY_NAMES)
   if (!validated.ok) {
-    console.error(`check:workspace: ${describeManifestError(validated.error)}`)
+    printError(`check:workspace: ${describeManifestError(validated.error)}`)
     return undefined
   }
 
@@ -136,14 +145,14 @@ export const main = async (): Promise<number> => {
   const plan = planWorkspaceRun(manifest, await presentDirectories())
 
   for (const line of describeWorkspaceRun(plan, requestedScript)) {
-    console.log(line)
+    print(line)
   }
 
   if (plan.targets.length === 0) {
     return 0
   }
 
-  console.log('')
+  print('')
 
   // Sequential: 15 concurrent `pnpm verify` runs would interleave their output
   // and make a single failure impossible to read.
@@ -152,7 +161,7 @@ export const main = async (): Promise<number> => {
       const previous = await accumulated
       const outcome = await runIn(entry.name)
       const symbol = outcome.status === 'passed' ? 'ok  ' : outcome.status === 'failed' ? 'FAIL' : 'skip'
-      console.log(`  ${symbol} ${entry.name}${outcome.status === 'passed' ? '' : ` — ${outcome.detail.split('\n')[0] ?? ''}`}`)
+      print(`  ${symbol} ${entry.name}${outcome.status === 'passed' ? '' : ` — ${outcome.detail.split('\n')[0] ?? ''}`}`)
       return [...previous, outcome]
     },
     Promise.resolve([]),
@@ -160,8 +169,8 @@ export const main = async (): Promise<number> => {
 
   const failed = outcomes.filter((outcome) => outcome.status === 'failed')
 
-  console.log('')
-  console.log(
+  print('')
+  print(
     `check:workspace: ${String(outcomes.filter((outcome) => outcome.status === 'passed').length)} passed, ` +
       `${String(failed.length)} failed, ` +
       `${String(outcomes.filter((outcome) => outcome.status === 'no-such-script').length)} skipped.`,
@@ -169,9 +178,9 @@ export const main = async (): Promise<number> => {
 
   if (failed.length > 0) {
     for (const outcome of failed) {
-      console.error('')
-      console.error(`----- ${outcome.name} (${requestedScript}) -----`)
-      console.error(outcome.detail)
+      printError('')
+      printError(`----- ${outcome.name} (${requestedScript}) -----`)
+      printError(outcome.detail)
     }
     return 1
   }

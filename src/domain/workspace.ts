@@ -17,6 +17,7 @@
  * `empty` from `partial` from `complete`. An empty workspace produces a plan
  * with no work and a clear message, and the caller exits 0.
  */
+import { assertUnreachable } from './exhaustive'
 import type { Manifest, ManifestEntry } from './manifest'
 import { isPinned } from './manifest'
 
@@ -105,6 +106,8 @@ export const describeWorkspaceRun = (plan: WorkspaceRunPlan, command: string): R
         `workspace: running "${command}" in all ${String(plan.targets.length)} repositories.`,
       )
       break
+    default:
+      assertUnreachable(plan.status)
   }
 
   if (plan.unmanaged.length > 0) {

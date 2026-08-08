@@ -75,6 +75,7 @@
  * option-injection class stays closed without them having to know it existed.
  * Do not delete it as dead code.
  */
+import { assertUnreachable } from './exhaustive'
 
 /** Manifest schema version. Bumped when the shape below changes incompatibly. */
 export const MANIFEST_VERSION = 1
@@ -389,5 +390,7 @@ export const describeManifestError = (error: ManifestError): string => {
       return `repos.json lists "${error.name}", which is not in the roster (domain/repository-roster.ts).`
     case 'MissingRepository':
       return `repos.json has no entry for "${error.name}", which the roster says this workspace manages.`
+    default:
+      return assertUnreachable(error)
   }
 }

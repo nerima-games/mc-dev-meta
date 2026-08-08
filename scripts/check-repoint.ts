@@ -127,6 +127,15 @@ const execFileAsync = promisify(execFile)
 
 const rootDir = process.cwd()
 
+/** This is a CLI script; stdout/stderr ARE its output, not debug noise. */
+const print = (line: string): void => {
+  process.stdout.write(`${line}\n`)
+}
+
+const printError = (line: string): void => {
+  process.stderr.write(`${line}\n`)
+}
+
 /** Directories never worth copying: huge, rebuilt, or the copy's own concern. */
 const UNCOPIED = new Set(['node_modules', '.git', 'coverage', 'dist', '.vite', '.vite-temp'])
 
@@ -392,12 +401,12 @@ export const main = async (): Promise<number> => {
     await loadManifest(rootDir, 'check:repoint'),
   )
   for (const line of describeProvenance(provenance)) {
-    console.log(line)
+    print(line)
   }
   for (const line of REPOINT_SOURCE_NOTE) {
-    console.log(line)
+    print(line)
   }
-  console.log('')
+  print('')
 
   const scratchRoot = await mkdtemp(path.join(os.tmpdir(), 'mc-dev-meta-repoint-'))
   try {
@@ -415,16 +424,16 @@ export const main = async (): Promise<number> => {
     const exitCode = repointRunExitCode(outcomes)
     for (const line of describeRepointRun(outcomes)) {
       if (exitCode === 0) {
-        console.log(line)
+        print(line)
       } else {
-        console.error(line)
+        printError(line)
       }
     }
 
     if (exitCode !== 0) {
-      console.error('')
+      printError('')
       for (const line of REPOINT_SOURCE_NOTE) {
-        console.error(line)
+        printError(line)
       }
     }
 
@@ -443,7 +452,7 @@ const isDirectRun = (): boolean => {
 
 if (isDirectRun()) {
   const code = await main().catch((cause: unknown) => {
-    console.error(`check:repoint: ${cause instanceof Error ? cause.message : String(cause)}`)
+    printError(`check:repoint: ${cause instanceof Error ? cause.message : String(cause)}`)
     return 1
   })
   process.exit(code)

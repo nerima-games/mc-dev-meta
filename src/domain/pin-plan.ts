@@ -32,6 +32,7 @@
  * once in the script and consumed by both planners, so the two commands cannot
  * drift into disagreeing about which repositories are safe to move.
  */
+import { assertUnreachable } from './exhaustive'
 import type { ManifestEntry } from './manifest'
 import type { RemoteObservation, SyncMode } from './sync-plan'
 
@@ -162,6 +163,8 @@ export const describePinDecision = (decision: PinDecision): string => {
       return decision.source === 'remote'
         ? `  pin      ${decision.name} @ ${decision.ref} (origin's tip; run \`pnpm sync\` to move repos/ onto it)`
         : `  pin      ${decision.name} @ ${decision.ref}`
+    default:
+      return assertUnreachable(decision)
   }
 }
 

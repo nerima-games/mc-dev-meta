@@ -71,6 +71,7 @@
  * are "HEAD is not reachable from the tip" — and of the two available mistakes,
  * refusing to move is the one that can be undone.
  */
+import { assertUnreachable } from './exhaustive'
 import { isPinned, type ManifestEntry } from './manifest'
 
 /**
@@ -382,6 +383,8 @@ export const applyAction = (
     case 'SkipDirty':
     case 'SkipDiverged':
       return state
+    default:
+      return assertUnreachable(action)
   }
 }
 
@@ -527,6 +530,8 @@ export const gitCommandsFor = (
     case 'SkipDirty':
     case 'SkipDiverged':
       return []
+    default:
+      return assertUnreachable(action)
   }
 }
 
@@ -540,6 +545,8 @@ const describeFetchReason = (reason: FetchReason): string => {
       return 'pinned ref not present locally'
     case 'latest':
       return '--latest: asking origin where its default branch is now'
+    default:
+      return assertUnreachable(reason)
   }
 }
 
@@ -567,5 +574,7 @@ export const describeAction = (action: SyncAction): string => {
         `${action.tip.slice(0, 12)}. Nothing was touched. Advancing would strand whatever is only ` +
         'here; push it, or check out the tip yourself if you meant to abandon it.'
       )
+    default:
+      return assertUnreachable(action)
   }
 }

@@ -973,11 +973,11 @@ describe('a transcribed column with no probe fails, and names the column', () =>
   })
 
   it('names the column and the fix in the report', () => {
-    const rendered = describeMirrorRun([compareMirror(spec, unprobed, agreeingSource, [])]).join('\n')
+    const report = describeMirrorRun([compareMirror(spec, unprobed, agreeingSource, [])]).join('\n')
 
-    expect(rendered).toContain('lightEmissionOfBlockId')
-    expect(rendered).toContain('"lightEmission" column')
-    expect(rendered).toContain('MIRROR_SPECS declares no property probe for it')
+    expect(report).toContain('lightEmissionOfBlockId')
+    expect(report).toContain('"lightEmission" column')
+    expect(report).toContain('MIRROR_SPECS declares no property probe for it')
   })
 
   it('says nothing when every transcribed column is probed', () => {
@@ -1053,7 +1053,7 @@ describe('the committed KNOWN_FINDINGS register', () => {
    * check, not maintained here.
    */
   it('records the property findings against the repository that owns the fix', () => {
-    const property = KNOWN_FINDINGS.filter((entry) =>
+    const propertyFindings = KNOWN_FINDINGS.filter((entry) =>
       entry.fingerprint.includes('"_tag":"PropertyDiffers"'),
     )
 
@@ -1070,8 +1070,8 @@ describe('the committed KNOWN_FINDINGS register', () => {
     // such an entry names the repository that owns the FIX, not the one that
     // detected it. Over an empty array it asserts nothing, and that is honest
     // rather than hidden — the length assertion above is what has teeth today.
-    expect(property).toHaveLength(0)
-    for (const entry of property) {
+    expect(propertyFindings).toHaveLength(0)
+    for (const entry of propertyFindings) {
       expect(entry.fingerprint.startsWith('mc-worldgen/domain/kernel-vocabulary.ts|')).toBe(true)
       expect(entry.owner).toBe('mc-worldgen')
     }

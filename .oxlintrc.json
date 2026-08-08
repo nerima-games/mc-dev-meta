@@ -27,12 +27,17 @@
     }
   },
   "plugins": [],
+  // Categories are deliberately "off": this repository enables individual
+  // rules explicitly below, not whole categories. Turning a category "warn"
+  // blanket-enables every rule oxlint tags with that category (far more than
+  // the curated list below), which is not the intent — see the curated
+  // "rules" block, organized by the same category names as section comments.
   "categories": {
-    "correctness": "warn",
-    "suspicious": "warn",
-    "perf": "warn",
-    "style": "warn",
-    "restriction": "warn"
+    "correctness": "off",
+    "suspicious": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off"
   },
   "rules": {
     // TypeScript-specific rules

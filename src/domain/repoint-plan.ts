@@ -802,14 +802,11 @@ export const describeRepointRun = (
           ? 'KNOWN'
           : 'ok   '
     const projects = outcome.projects.map((project) => project.project).join(', ')
+    const projectSuffix = projects.length > 0 ? ` (${projects})` : ''
+    const knownSuffix =
+      outcome.known.length > 0 ? `, ${String(outcome.known.length)} known outstanding error(s)` : ''
     lines.push(
-      `  ${status} ${repointPath(outcome.spec)} -> ${outcome.spec.packageName} — ` +
-        `${String(outcome.rewrites)} import(s) rewritten, compiled ` +
-        `${String(outcome.projects.length)} project(s)` +
-        (projects.length > 0 ? ` (${projects})` : '') +
-        (outcome.known.length > 0
-          ? `, ${String(outcome.known.length)} known outstanding error(s)`
-          : ''),
+      `  ${status} ${repointPath(outcome.spec)} -> ${outcome.spec.packageName} — ${String(outcome.rewrites)} import(s) rewritten, compiled ${String(outcome.projects.length)} project(s)${projectSuffix}${knownSuffix}`,
     )
     if (outcome.projects.length === 0) {
       lines.push(

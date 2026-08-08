@@ -102,6 +102,7 @@
  * worse than no checker.
  */
 
+import { assertUnreachable } from './exhaustive'
 import type { TypeShape, TypeVariant } from './type-shape'
 
 // ---------------------------------------------------------------------------
@@ -881,6 +882,8 @@ export const observationKind = (observation: ValueObservation): string => {
       return 'a Brand refinement'
     case 'Opaque':
       return `a ${observation.kind}`
+    default:
+      return assertUnreachable(observation)
   }
 }
 
@@ -1562,6 +1565,8 @@ export const describeMirrorFinding = (spec: MirrorSpec, finding: MirrorFinding):
       )
     case 'NothingObserved':
       return `${at}: ${finding.detail}`
+    default:
+      return assertUnreachable(finding)
   }
 }
 
@@ -1761,9 +1766,9 @@ export const describeProvenance = (
     `${String(off.length)} are NOT, so this run compared revisions the manifest does not name:`,
   )
   for (const row of off) {
+    const dirtySuffix = row.dirty ? '  (uncommitted changes — disk is not any revision)' : ''
     lines.push(
-      `    ${row.name}  disk ${shortSha(row.head)}  pinned ${row.pinned === undefined ? 'unpinned' : shortSha(row.pinned)}` +
-        (row.dirty ? '  (uncommitted changes — disk is not any revision)' : ''),
+      `    ${row.name}  disk ${shortSha(row.head)}  pinned ${row.pinned === undefined ? 'unpinned' : shortSha(row.pinned)}${dirtySuffix}`,
     )
   }
   lines.push(
@@ -1811,21 +1816,14 @@ export const describeMirrorRun = (
       lines.push(`  skip ${mirrorPath(outcome.spec)} — ${outcome.reason}`)
       continue
     }
-    const counts =
-      `${String(outcome.valuesCompared)} value(s), ${String(outcome.typesCompared)} type(s), ` +
-      `${String(outcome.capabilitiesCompared)} capability probe(s), ` +
-      `${String(outcome.propertiesCompared)} property probe(s)` +
-      (outcome.propertiesCompared > 0
-        ? ` over ${String(outcome.propertyIdsCompared)} id reading(s)`
-        : '')
+    const idsSuffix =
+      outcome.propertiesCompared > 0 ? ` over ${String(outcome.propertyIdsCompared)} id reading(s)` : ''
+    const counts = `${String(outcome.valuesCompared)} value(s), ${String(outcome.typesCompared)} type(s), ${String(outcome.capabilitiesCompared)} capability probe(s), ${String(outcome.propertiesCompared)} property probe(s)${idsSuffix}`
     const status =
       outcome.findings.length > 0 ? 'FAIL' : outcome.known.length > 0 ? 'KNOWN' : 'ok   '
-    lines.push(
-      `  ${status} ${mirrorPath(outcome.spec)} vs ${outcome.spec.source} — ${counts}` +
-        (outcome.known.length > 0
-          ? `, ${String(outcome.known.length)} known outstanding defect(s)`
-          : ''),
-    )
+    const knownSuffix =
+      outcome.known.length > 0 ? `, ${String(outcome.known.length)} known outstanding defect(s)` : ''
+    lines.push(`  ${status} ${mirrorPath(outcome.spec)} vs ${outcome.spec.source} — ${counts}${knownSuffix}`)
   }
 
   const known = outcomes.flatMap((outcome) =>
