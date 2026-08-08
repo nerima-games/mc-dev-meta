@@ -85,6 +85,16 @@ import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../src/domain/workspace'
 
 const execFileAsync = promisify(execFile)
 const rootDir = process.cwd()
+
+/** This is a CLI script; stdout/stderr ARE its output, not debug noise. */
+const print = (line: string): void => {
+  process.stdout.write(`${line}\n`)
+}
+
+const printError = (line: string): void => {
+  process.stderr.write(`${line}\n`)
+}
+
 const isDryRun = process.argv.includes('--dry-run')
 
 /** Same flag, same word, same meaning as `pnpm sync --latest`. */
@@ -159,28 +169,28 @@ const observe = async (name: string): Promise<PinObservation> => {
 export const main = async (): Promise<number> => {
   const raw = await readFile(path.join(rootDir, MANIFEST_FILENAME), 'utf8').catch(() => undefined)
   if (raw === undefined) {
-    console.error(`update:manifest: cannot read ${MANIFEST_FILENAME}.`)
+    printError(`update:manifest: cannot read ${MANIFEST_FILENAME}.`)
     return 1
   }
 
   const parsed = parseManifest(raw)
   if (!parsed.ok) {
-    console.error(`update:manifest: ${describeManifestError(parsed.error)}`)
+    printError(`update:manifest: ${describeManifestError(parsed.error)}`)
     return 1
   }
 
   const validated = validateAgainstRoster(parsed.value, MANAGED_REPOSITORY_NAMES)
   if (!validated.ok) {
-    console.error(`update:manifest: ${describeManifestError(validated.error)}`)
+    printError(`update:manifest: ${describeManifestError(validated.error)}`)
     return 1
   }
 
-  console.log(
+  print(
     mode === 'latest'
       ? `update:manifest (--latest): fetching, then pinning to each origin's tip. repos/ is NOT moved — run \`pnpm sync\` for that.`
       : `update:manifest: pinning to the HEAD of each working copy under ${REPOS_DIRECTORY}/.`,
   )
-  console.log('')
+  print('')
 
   const outcome = await validated.value.repositories.reduce<
     Promise<{ readonly manifest: Manifest; readonly decisions: ReadonlyArray<PinDecision> }>
@@ -188,7 +198,7 @@ export const main = async (): Promise<number> => {
     async (accumulated, entry) => {
       const { manifest, decisions } = await accumulated
       const decision = planPin(entry, await observe(entry.name), mode)
-      console.log(describePinDecision(decision))
+      print(describePinDecision(decision))
 
       if (decision._tag !== 'Pin') {
         return { manifest, decisions: [...decisions, decision] }
@@ -196,7 +206,7 @@ export const main = async (): Promise<number> => {
 
       const next = withPinnedRef(manifest, entry.name, decision.ref)
       if (!next.ok) {
-        console.error(`  error    ${entry.name} — ${describeManifestError(next.error)}`)
+        printError(`  error    ${entry.name} — ${describeManifestError(next.error)}`)
         return { manifest, decisions }
       }
       return { manifest: next.value, decisions: [...decisions, decision] }
@@ -209,7 +219,7 @@ export const main = async (): Promise<number> => {
   const serialised = serialiseManifest(updated)
   const changed = serialised !== raw
 
-  console.log('')
+  print('')
 
   // Every skip that could hide a newer revision is named here, whatever else
   // happened. The old code reported skips inline and then printed a one-line
@@ -222,12 +232,12 @@ export const main = async (): Promise<number> => {
     [summary.skippedRemoteUnknown, "could not be asked where origin's tip is"],
   ] as ReadonlyArray<readonly [ReadonlyArray<string>, string]>) {
     if (names.length > 0) {
-      console.log(`NOT pinned because they ${why}: ${names.join(', ')}.`)
+      print(`NOT pinned because they ${why}: ${names.join(', ')}.`)
     }
   }
 
   if (!changed) {
-    console.log(
+    print(
       mode === 'latest'
         ? `update:manifest (--latest): ${MANIFEST_FILENAME} already names every origin's tip. This one DID ask the remotes.`
         : `update:manifest: ${MANIFEST_FILENAME} already matches every working copy under ${REPOS_DIRECTORY}/.`,
@@ -237,7 +247,7 @@ export const main = async (): Promise<number> => {
     // puts repos/ AT the pin, so the two agreeing is the NORMAL state and says
     // nothing at all about GitHub. Only --latest can answer that question.
     if (mode !== 'latest') {
-      console.log(
+      print(
         'That is not the same as "the pins are current" — no remote was contacted. `pnpm sync` puts ' +
           `${REPOS_DIRECTORY}/ at the pin, so agreement here is the expected state even when every ` +
           'repository has moved on GitHub. Run `pnpm update:manifest --latest` to ask.',
@@ -247,15 +257,15 @@ export const main = async (): Promise<number> => {
   }
 
   if (isDryRun) {
-    console.log(`update:manifest (--dry-run): ${MANIFEST_FILENAME} would change. Nothing was written.`)
+    print(`update:manifest (--dry-run): ${MANIFEST_FILENAME} would change. Nothing was written.`)
     return 0
   }
 
   await writeFile(path.join(rootDir, MANIFEST_FILENAME), serialised, 'utf8')
-  console.log(`update:manifest: wrote ${MANIFEST_FILENAME}. COMMIT IT — that is what makes the composite state reproducible.`)
+  print(`update:manifest: wrote ${MANIFEST_FILENAME}. COMMIT IT — that is what makes the composite state reproducible.`)
 
   if (mode === 'latest' && summary.pinned.length > 0) {
-    console.log(
+    print(
       `${String(summary.pinned.length)} pin(s) now name a revision that ${REPOS_DIRECTORY}/ does not hold. ` +
         'Run `pnpm sync` to bring the working copies onto them, or `pnpm check:mirrors` will keep ' +
         'comparing the revisions you had before.',
@@ -264,7 +274,7 @@ export const main = async (): Promise<number> => {
 
   const stillUnpinned = unpinnedEntries(updated)
   if (stillUnpinned.length > 0) {
-    console.log(
+    print(
       `note: ${String(stillUnpinned.length)} repository/ies remain unpinned: ` +
         `${stillUnpinned.map((entry) => entry.name).join(', ')}.`,
     )

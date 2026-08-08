@@ -104,6 +104,15 @@ const execFileAsync = promisify(execFile)
 
 const rootDir = process.cwd()
 
+/** This is a CLI script; stdout/stderr ARE its output, not debug noise. */
+const print = (line: string): void => {
+  process.stdout.write(`${line}\n`)
+}
+
+const printError = (line: string): void => {
+  process.stderr.write(`${line}\n`)
+}
+
 const isDryRun = process.argv.includes('--dry-run')
 
 /**
@@ -272,56 +281,74 @@ type RepositoryOutcome = {
   readonly failure: string | undefined
 }
 
-const syncOne = async (entry: ManifestEntry): Promise<RepositoryOutcome> => {
-  const directory = path.join(REPOS_DIRECTORY, entry.name)
-  const actions: Array<SyncAction> = []
-  let state = await observe(entry, false)
-
-  for (let round = 0; round < MAX_ROUNDS; round += 1) {
-    const action = planSync(entry, state, mode)
-    actions.push(action)
-    console.log(`  ${describeAction(action)}`)
-
-    if (isNoOp(action) || isDryRun) {
-      break
-    }
-
-    const commands = gitCommandsFor(action, directory)
-    const results = await commands.reduce<Promise<ReadonlyArray<GitResult>>>(
-      async (accumulated, argv) => [...(await accumulated), await runGit(argv)],
-      Promise.resolve([]),
-    )
-
-    const firstFailure = results.find((result) => !result.ok)
-    if (firstFailure !== undefined && !firstFailure.ok) {
-      return { name: entry.name, actions, failure: firstFailure.detail }
-    }
-
-    // Every action in `actions` has now run without failing — a failure returns
-    // above — so "has this run talked to the remote yet" is exactly a question
-    // about the actions taken so far.
-    state = await observe(entry, actions.some(fetchesFromRemote))
+/**
+ * One round of settling: plan, apply, observe, repeat.
+ *
+ * Recursive rather than a `for` loop on purpose — each round's git commands
+ * and each round's `observe` depend on the PREVIOUS round's outcome, so the
+ * awaits below cannot be batched into `Promise.all`. Recursion says that in
+ * the shape of the code instead of only in a comment: there is no loop
+ * construct left for a well-meaning edit to "parallelize".
+ */
+const syncRound = async (
+  entry: ManifestEntry,
+  directory: string,
+  state: WorkingCopyState,
+  actions: Array<SyncAction>,
+  round: number,
+): Promise<RepositoryOutcome> => {
+  if (round >= MAX_ROUNDS) {
+    return { name: entry.name, actions, failure: undefined }
   }
 
-  return { name: entry.name, actions, failure: undefined }
+  const action = planSync(entry, state, mode)
+  actions.push(action)
+  print(`  ${describeAction(action)}`)
+
+  if (isNoOp(action) || isDryRun) {
+    return { name: entry.name, actions, failure: undefined }
+  }
+
+  const commands = gitCommandsFor(action, directory)
+  const results = await commands.reduce<Promise<ReadonlyArray<GitResult>>>(
+    async (accumulated, argv) => [...(await accumulated), await runGit(argv)],
+    Promise.resolve([]),
+  )
+
+  const firstFailure = results.find((result) => !result.ok)
+  if (firstFailure !== undefined && !firstFailure.ok) {
+    return { name: entry.name, actions, failure: firstFailure.detail }
+  }
+
+  // Every action in `actions` has now run without failing — a failure returns
+  // above — so "has this run talked to the remote yet" is exactly a question
+  // about the actions taken so far.
+  const nextState = await observe(entry, actions.some(fetchesFromRemote))
+  return syncRound(entry, directory, nextState, actions, round + 1)
+}
+
+const syncOne = async (entry: ManifestEntry): Promise<RepositoryOutcome> => {
+  const directory = path.join(REPOS_DIRECTORY, entry.name)
+  const state = await observe(entry, false)
+  return syncRound(entry, directory, state, [], 0)
 }
 
 const loadManifest = async (): Promise<Manifest | undefined> => {
   const raw = await readFile(path.join(rootDir, MANIFEST_FILENAME), 'utf8').catch(() => undefined)
   if (raw === undefined) {
-    console.error(`sync: cannot read ${MANIFEST_FILENAME}. It is committed; are you in the repository root?`)
+    printError(`sync: cannot read ${MANIFEST_FILENAME}. It is committed; are you in the repository root?`)
     return undefined
   }
 
   const parsed = parseManifest(raw)
   if (!parsed.ok) {
-    console.error(`sync: ${describeManifestError(parsed.error)}`)
+    printError(`sync: ${describeManifestError(parsed.error)}`)
     return undefined
   }
 
   const validated = validateAgainstRoster(parsed.value, MANAGED_REPOSITORY_NAMES)
   if (!validated.ok) {
-    console.error(`sync: ${describeManifestError(validated.error)}`)
+    printError(`sync: ${describeManifestError(validated.error)}`)
     return undefined
   }
 
@@ -339,12 +366,12 @@ export const main = async (): Promise<number> => {
       ? "origin's tip (--latest: repos.json is READ for the clone URLs only, and is NOT updated)"
       : 'the revisions pinned in repos.json'
 
-  console.log(
+  print(
     isDryRun
       ? `sync (--dry-run): planning ${String(manifest.repositories.length)} repositories into ${REPOS_DIRECTORY}/ against ${target} — NOTHING will be modified.`
       : `sync: ${String(manifest.repositories.length)} repositories into ${REPOS_DIRECTORY}/, at ${target}.`,
   )
-  console.log('')
+  print('')
 
   // Sequential rather than parallel: this talks to a remote 15 times, and
   // interleaved progress output from 15 clones is unreadable when one of them
@@ -352,7 +379,7 @@ export const main = async (): Promise<number> => {
   const outcomes = await manifest.repositories.reduce<Promise<ReadonlyArray<RepositoryOutcome>>>(
     async (accumulated, entry) => {
       const previous = await accumulated
-      console.log(entry.name)
+      print(entry.name)
       return [...previous, await syncOne(entry)]
     },
     Promise.resolve([]),
@@ -361,8 +388,8 @@ export const main = async (): Promise<number> => {
   const summary = summarise(outcomes.flatMap((outcome) => [...outcome.actions]))
   const failures = outcomes.filter((outcome) => outcome.failure !== undefined)
 
-  console.log('')
-  console.log(
+  print('')
+  print(
     `sync: cloned ${String(summary.cloned.length)}, ` +
       `fetched ${String(summary.fetched.length)}, ` +
       `checked out ${String(summary.checkedOut.length)}, ` +
@@ -372,17 +399,17 @@ export const main = async (): Promise<number> => {
   )
 
   if (summary.skippedDirty.length > 0) {
-    console.log('')
-    console.log(`NOT synced because they have uncommitted changes: ${summary.skippedDirty.join(', ')}.`)
-    console.log('Nothing in them was touched. Commit or stash, then re-run `pnpm sync`.')
+    print('')
+    print(`NOT synced because they have uncommitted changes: ${summary.skippedDirty.join(', ')}.`)
+    print('Nothing in them was touched. Commit or stash, then re-run `pnpm sync`.')
   }
 
   if (summary.skippedDiverged.length > 0) {
-    console.log('')
-    console.log(
+    print('')
+    print(
       `NOT advanced because their HEAD is not reachable from origin's tip: ${summary.skippedDiverged.join(', ')}.`,
     )
-    console.log(
+    print(
       'Nothing in them was touched. These working copies are detached, so a commit made in one is ' +
         'reachable from HEAD and nothing else; moving HEAD would leave it in the reflog and nowhere ' +
         'a person would look. Push it, or check out the tip yourself if you meant to abandon it.',
@@ -392,8 +419,8 @@ export const main = async (): Promise<number> => {
   // The default mode cannot make the pin move — that is the deadlock this
   // flag exists to break — so the reminder belongs on the run that CAN.
   if (mode === 'latest' && !isDryRun && summary.checkedOut.length > 0) {
-    console.log('')
-    console.log(
+    print('')
+    print(
       `${String(summary.checkedOut.length)} working copy/ies now sit AHEAD of repos.json. Until you run ` +
         '`pnpm update:manifest` and commit the result, the composite state on this machine is not ' +
         'recorded anywhere and `pnpm check:mirrors` is comparing revisions the manifest does not name.',
@@ -401,13 +428,13 @@ export const main = async (): Promise<number> => {
   }
 
   if (failures.length > 0) {
-    console.error('')
-    console.error(`sync: ${String(failures.length)} repository/ies failed:`)
+    printError('')
+    printError(`sync: ${String(failures.length)} repository/ies failed:`)
     for (const failure of failures) {
-      console.error(`  ${failure.name}: ${failure.failure ?? 'unknown error'}`)
+      printError(`  ${failure.name}: ${failure.failure ?? 'unknown error'}`)
     }
-    console.error('')
-    console.error(
+    printError('')
+    printError(
       'A repository that does not exist on the remote yet is an expected failure while the project ' +
         'is being built bottom-up (plan.md §6 Step 2). Everything else was synced.',
     )

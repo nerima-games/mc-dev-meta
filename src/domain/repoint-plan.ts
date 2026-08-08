@@ -415,6 +415,12 @@ export const parseDiagnostics = (output: string): ReadonlyArray<Diagnostic> =>
         return []
       }
       const [, file, line, column, code, message] = match
+      // Structurally unreachable: `DIAGNOSTIC_LINE` has no optional capture
+      // group, so a successful `match` (checked above) has already captured
+      // all five. TypeScript's `RegExpExecArray` typing does not encode that
+      // a group is unconditional, hence the check — but no input can drive
+      // this arm without DIAGNOSTIC_LINE itself gaining an optional group.
+      /* v8 ignore next 9 */
       if (
         file === undefined ||
         line === undefined ||
@@ -802,14 +808,11 @@ export const describeRepointRun = (
           ? 'KNOWN'
           : 'ok   '
     const projects = outcome.projects.map((project) => project.project).join(', ')
+    const projectSuffix = projects.length > 0 ? ` (${projects})` : ''
+    const knownSuffix =
+      outcome.known.length > 0 ? `, ${String(outcome.known.length)} known outstanding error(s)` : ''
     lines.push(
-      `  ${status} ${repointPath(outcome.spec)} -> ${outcome.spec.packageName} — ` +
-        `${String(outcome.rewrites)} import(s) rewritten, compiled ` +
-        `${String(outcome.projects.length)} project(s)` +
-        (projects.length > 0 ? ` (${projects})` : '') +
-        (outcome.known.length > 0
-          ? `, ${String(outcome.known.length)} known outstanding error(s)`
-          : ''),
+      `  ${status} ${repointPath(outcome.spec)} -> ${outcome.spec.packageName} — ${String(outcome.rewrites)} import(s) rewritten, compiled ${String(outcome.projects.length)} project(s)${projectSuffix}${knownSuffix}`,
     )
     if (outcome.projects.length === 0) {
       lines.push(

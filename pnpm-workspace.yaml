@@ -13,3 +13,5 @@
 # it from the packages it exists to fetch.
 packages:
   - 'repos/*'
+allowBuilds:
+  esbuild: true

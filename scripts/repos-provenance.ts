@@ -33,6 +33,11 @@ import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../src/domain/workspace'
 
 const execFileAsync = promisify(execFile)
 
+/** This is CLI-script support code; stderr IS its output, not debug noise. */
+const printError = (line: string): void => {
+  process.stderr.write(`${line}\n`)
+}
+
 /**
  * Read-only git, sharing the destructive-argument refusal with the sync side.
  *
@@ -71,7 +76,7 @@ export const loadManifest = async (
   }
   const parsed = parseManifest(raw)
   if (!parsed.ok) {
-    console.error(
+    printError(
       `${label}: could not read pins from ${MANIFEST_FILENAME}: ${describeManifestError(parsed.error)}`,
     )
     return undefined

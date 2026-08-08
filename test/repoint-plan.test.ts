@@ -146,6 +146,12 @@ describe('REPOINT_SPECS', () => {
     )
   })
 
+  // Every real spec's `file` ends in `.ts`, but the function does not assume
+  // it — this pins the fallback for the day it is fed something else.
+  it('uses the basename as-is when it has no .ts extension to strip', () => {
+    expect(mirrorModuleName({ ...spec, file: 'domain/kernel-vocabulary' })).toBe('kernel-vocabulary')
+  })
+
   it('renders a path for messages', () => {
     expect(repointPath(spec)).toBe('mx-gameplay/domain/frame-contract.ts')
   })
@@ -286,6 +292,22 @@ describe('withWorkspaceDependency', () => {
       2,
     )
     expect(withWorkspaceDependency(text, '@nerima-games/mc-kernel')).toBe(text)
+  })
+
+  // Defensive: `package.json` is read off disk and parsed with no schema
+  // check upstream of this function. A package.json that parses to something
+  // other than an object (a bare string, a number, `null` — `typeof null` is
+  // famously `'object'`, which is exactly why the check is `!== 'object' ||
+  // === null` rather than either alone) must be left alone rather than crash
+  // trying to spread it as a record. An ARRAY is deliberately not one of
+  // these cases: `typeof [] === 'object'` and `[] !== null`, so this function
+  // does not distinguish an array from a plain object today — it would spread
+  // the array's own indices away and add a `dependencies` key, which is a
+  // separate, pre-existing question this test does not adjudicate.
+  it('leaves non-object JSON untouched rather than crashing on it', () => {
+    for (const notAnObject of ['"just a string"', 'null', '42']) {
+      expect(withWorkspaceDependency(notAnObject, '@nerima-games/mc-kernel')).toBe(notAnObject)
+    }
   })
 })
 
@@ -529,6 +551,23 @@ describe('staleKnownRepointFindings', () => {
     const outcome = classifyRepoint(spec, 3, [project({ repointed: [diagnostic()] })], [entry])
     expect(staleKnownRepointFindings([outcome], [entry])).toEqual([])
   })
+
+  // Defensive: `classifyRepoint` never puts an item in `known` without a
+  // matching registry entry (that is what makes it `known`), but this
+  // function's own type signature accepts any `RepointOutcome`, including one
+  // assembled by hand rather than by `classifyRepoint`. An item whose `entry`
+  // is `undefined` must not be treated as a match for anything.
+  it('does not treat an undefined entry as a match for a registry fingerprint', () => {
+    const handAssembled: RepointOutcome = {
+      _tag: 'Repointed',
+      spec,
+      rewrites: 3,
+      projects: [project()],
+      introduced: [],
+      known: [{ project: 'tsconfig.test.json', diagnostic: diagnostic(), entry: undefined }],
+    }
+    expect(staleKnownRepointFindings([handAssembled], [entry])).toEqual([entry])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -608,6 +647,35 @@ describe('describeRepointRun', () => {
     expect(lines).toContain('(2 occurrence(s))')
     expect(lines).toContain('owner: mx-gameplay')
     expect(lines).toContain('KNOWN')
+  })
+
+  it('prints nothing, in the known-error section, for a registry entry with zero occurrences this run', () => {
+    // REGRESSION: the loop below is grouped BY REGISTRY ENTRY, not by
+    // occurrence, so it has to actively skip an entry with zero matches
+    // rather than print an empty "(0 occurrence(s))" section for it. Scoped to
+    // a repository this run never touches at all, so the SEPARATE staleness
+    // report (`staleKnownRepointFindings`, tested above) does not also print
+    // its summary and make this assertion pass for the wrong reason.
+    const reproducing: KnownRepointFinding = {
+      fingerprint: fingerprintDiagnostic(spec, 'tsconfig.test.json', diagnostic()),
+      summary: 'the frame runner provides no ClockPort',
+      owner: 'mx-gameplay',
+      fix: 'provide one',
+    }
+    const otherSpec: RepointSpec = { ...spec, repository: 'mx-redstone', file: 'domain/other-port.ts' }
+    const notInThisRun: KnownRepointFinding = {
+      fingerprint: fingerprintDiagnostic(otherSpec, 'tsconfig.test.json', diagnostic()),
+      summary: 'a defect belonging to a repository this run never attempts',
+      owner: 'mx-redstone',
+      fix: 'irrelevant to this test',
+    }
+    const lines = describeRepointRun(
+      [classifyRepoint(spec, 3, [project({ repointed: [diagnostic()] })], [reproducing, notInThisRun])],
+      [reproducing, notInThisRun],
+    ).join('\n')
+
+    expect(lines).toContain('the frame runner provides no ClockPort')
+    expect(lines).not.toContain('a defect belonging to a repository this run never attempts')
   })
 
   it('tells the reader to delete a register entry that stopped reproducing', () => {

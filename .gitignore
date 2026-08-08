@@ -24,6 +24,7 @@ repos/
 # Dependencies
 node_modules/
 .pnpm-store/
+.corepack/
 
 # THE WORKSPACE-ROOT LOCKFILE.
 #

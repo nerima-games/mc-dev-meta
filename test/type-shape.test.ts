@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest'
 import {
   blankCommentsAndStrings,
   declaredTypes,
+  describeShapeError,
   parseApiLock,
   publishedNames,
   typesInApiLock,
@@ -64,6 +65,39 @@ describe('blanking comments and strings', () => {
 
     expect(memberNames(shapeOf(text, 'A'))).toStrictEqual(['real'])
   })
+
+  // REGRESSION: an escaped quote does not end the string. Without this, a
+  // string like 'it\'s fine' would be read as closing after `it`, and
+  // everything from the `s` onward — including any brace in the rest of the
+  // file — would be read as ordinary code instead of blanked.
+  it('does not end a string literal early on an escaped quote', () => {
+    const text = "const s = 'it\\'s fine'\ntype A = { real: 1 }\n"
+
+    expect(memberNames(shapeOf(text, 'A'))).toStrictEqual(['real'])
+  })
+
+  // The escape-and-newline case: a backslash line continuation inside a
+  // string. Length must still be preserved across it (both blanked
+  // characters emitted), and the newline itself must survive so a member
+  // anchored to a line start later in the same string's line does not shift.
+  it('preserves length and the newline across a backslash line-continuation inside a string', () => {
+    const text = "const s = 'a\\\nb'\ntype A = { real: 1 }\n"
+    const blanked = blankCommentsAndStrings(text)
+
+    expect(blanked).toHaveLength(text.length)
+    expect(memberNames(shapeOf(text, 'A'))).toStrictEqual(['real'])
+  })
+
+  // A template literal can legitimately span several lines with no escape at
+  // all — the newline is a real character inside the string, not a
+  // continuation — and it must be preserved the same way.
+  it('preserves a newline that appears literally inside a template literal', () => {
+    const text = 'const s = `a\nb`\ntype A = { real: 1 }\n'
+    const blanked = blankCommentsAndStrings(text)
+
+    expect(blanked.split('\n')).toHaveLength(text.split('\n').length)
+    expect(memberNames(shapeOf(text, 'A'))).toStrictEqual(['real'])
+  })
 })
 
 describe('reading a plain object type', () => {
@@ -99,6 +133,17 @@ describe('reading a plain object type', () => {
     expect(memberNames(shapeOf(reordered, 'ClockService'))).toStrictEqual(
       memberNames(shapeOf(source, 'ClockService')),
     )
+  })
+
+  // Defensive: the sort comparator's tie-break (equal names) has nothing real
+  // to exercise it — TypeScript itself would reject two members of the same
+  // name — but this parser is text-based and does not know that, so a
+  // duplicate key must still sort stably rather than the comparator
+  // mis-signalling on the equal case.
+  it('does not crash or reorder unstably when two members share a name', () => {
+    const text = ['export type Dup = {', '  readonly a: 1', '  readonly a: 2', '}'].join('\n')
+
+    expect(memberNames(shapeOf(text, 'Dup'))).toStrictEqual(['a', 'a'])
   })
 
   it('reads optionality, which is semantic', () => {
@@ -151,6 +196,18 @@ describe('reading a plain object type', () => {
     ].join('\n')
 
     expect(memberNames(shapeOf(text, 'GameModule'))).toStrictEqual(['frameStages', 'layers'])
+  })
+
+  // REGRESSION: a generic parameter's default can itself be a function type,
+  // whose `=>` must not be read as closing the parameter list on its `>`.
+  it('is not confused by an arrow function type inside a generic default', () => {
+    const text = [
+      'export type Middleware<T = (input: string) => number> = {',
+      '  readonly run: T',
+      '}',
+    ].join('\n')
+
+    expect(memberNames(shapeOf(text, 'Middleware'))).toStrictEqual(['run'])
   })
 })
 
@@ -242,6 +299,80 @@ describe('declarations that are not object types', () => {
     const parsed = declaredTypes('export type Broken = {\n  readonly a: 1\n')
 
     expect(parsed.ok).toBe(false)
+    expect(parsed.ok ? '' : describeShapeError(parsed.error)).toContain('"Broken" is never closed')
+  })
+
+  // REGRESSION: a non-object operand can itself contain parens or brackets —
+  // a function type, a tuple — before the union's next `|`. Those must be
+  // stepped over as a unit rather than mistaken for the separator search
+  // finding nothing, or for the `{` of an object arm.
+  it('steps over a parenthesised function type and a tuple before the next union arm', () => {
+    const text = [
+      'export type Handler =',
+      '  | ((input: [string, number]) => void)',
+      "  | { readonly _tag: 'Noop' }",
+      '',
+    ].join('\n')
+
+    const shape = shapeOf(text, 'Handler')
+    expect(shape.variants.map((variant) => variant.tag)).toStrictEqual(['Noop'])
+  })
+
+  // REGRESSION: a bare alias with no trailing newline at all — the last line
+  // of a file that does not end in one — must still be read as a
+  // zero-operand declaration rather than running off the end of the text.
+  it('reads a bare alias that ends the file with no trailing newline', () => {
+    const shape = shapeOf('export type FrameServices = never', 'FrameServices')
+    expect(shape.variants).toStrictEqual([])
+  })
+
+  // REGRESSION: only TOP-LEVEL declarations are part of the surface this tool
+  // compares. A `type` nested inside a function body is scratch, not a
+  // published shape, and reading it would let an unrelated local alias
+  // collide with a real top-level type of the same name.
+  it('ignores a type declared inside a function body', () => {
+    const text = [
+      'export type Position = { x: 1 }',
+      '',
+      'function helper() {',
+      '  type Position = { y: 2 }',
+      '  return null',
+      '}',
+    ].join('\n')
+
+    expect(memberNames(shapeOf(text, 'Position'))).toStrictEqual(['x'])
+  })
+
+  // REGRESSION: a `type` keyword with no `=` after it (truncated source, or a
+  // generic parameter list that never closes) must be skipped rather than
+  // read as declaring an alias to whatever text happens to follow.
+  it('ignores a type declaration with no generic list ever closed', () => {
+    const text = ['export type Broken<T', '', 'export type Position = { x: 1 }'].join('\n')
+
+    const parsed = declaredTypes(text)
+    if (!parsed.ok) {
+      throw new Error('fixture did not parse')
+    }
+    expect(parsed.value.has('Broken')).toBe(false)
+    expect(memberNames(shapeOf(text, 'Position'))).toStrictEqual(['x'])
+  })
+
+  // REGRESSION: an `interface` heading with no body brace anywhere in the
+  // REST of the file (truncated source) must be skipped, the same way a
+  // `type` with no `=` is. `Position` is placed BEFORE `Broken` here on
+  // purpose: the search for `{` scans forward from the heading, so a brace
+  // earlier in the file must not be mistaken for this declaration's body.
+  it('ignores a trailing interface declaration with no opening brace anywhere after it', () => {
+    const text = ['export type Position = { x: 1 }', '', 'export interface Broken extends Bar'].join(
+      '\n',
+    )
+
+    const parsed = declaredTypes(text)
+    if (!parsed.ok) {
+      throw new Error('fixture did not parse')
+    }
+    expect(parsed.value.has('Broken')).toBe(false)
+    expect(memberNames(shapeOf(text, 'Position'))).toStrictEqual(['x'])
   })
 })
 
@@ -306,5 +437,28 @@ describe('reading a committed api-lock.md', () => {
     ])
     expect(parsed.value.get('DeltaTimeSecs')?.variants).toStrictEqual([])
     expect(parsed.value.has('AIR_BLOCK_ID')).toBe(false)
+  })
+
+  // REGRESSION: `typesInApiLock` runs `declaredTypes` per entry and must not
+  // swallow a failure from one entry's fenced block — a generated file this
+  // broken is itself the finding, not something to silently skip past.
+  it('propagates a parse failure from a single entry rather than skipping it', () => {
+    const broken = [
+      '# API lock — @nerima-games/mc-kernel',
+      '',
+      'format: 1',
+      '',
+      '### Broken  `type`',
+      '',
+      '```ts',
+      'type Broken = {',
+      '  readonly a: 1',
+      '```',
+      '',
+    ].join('\n')
+
+    const parsed = typesInApiLock(broken)
+    expect(parsed.ok).toBe(false)
+    expect(parsed.ok ? '' : parsed.error.name).toBe('Broken')
   })
 })

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   describeManifestError,
   entryNamed,
@@ -84,6 +84,33 @@ describe('parsing', () => {
 
   it('rejects text that is not JSON', () => {
     expect(parsedError(parseManifest('not json'))?._tag).toBe('NotJson')
+  })
+
+  // REGRESSION: `JSON.parse` always throws a real `Error` in practice, but the
+  // catch clause's `cause` is typed `unknown` and does not assume that. This
+  // pins the fallback for the case where whatever parses the document throws
+  // something else, so the detail is still a usable string rather than
+  // "[object Object]" or a crash from calling `.message` on a non-Error.
+  it('still produces a usable detail if the parser throws something other than an Error', () => {
+    // A class instance rather than a bare string literal, so this exercises
+    // the same `cause instanceof Error` fallback without itself violating
+    // `no-throw-literal` — the linter has no way to know NotAnError.toString()
+    // is the thing under test here, only that it is not a literal.
+    class NotAnError {
+      toString(): string {
+        return 'boom'
+      }
+    }
+    const spy = vi.spyOn(JSON, 'parse').mockImplementation(() => {
+      throw new NotAnError()
+    })
+    try {
+      const error = parsedError(parseManifest('irrelevant, JSON.parse is stubbed'))
+      expect(error?._tag).toBe('NotJson')
+      expect(error?._tag === 'NotJson' ? error.detail : undefined).toBe('boom')
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('rejects JSON that is not an object', () => {
@@ -329,5 +356,75 @@ describe('clone URL validation', () => {
     })
     expect(message).toContain('ext::sh')
     expect(message).toContain('https://github.com/nerima-games/')
+  })
+})
+
+// REGRESSION: every ManifestError tag must have a real, checked message.
+// `describeManifestError` is what a maintainer reads when `pnpm sync` or
+// `pnpm update:manifest` refuses to run — an unchecked case is a message
+// nobody has ever actually read appear.
+describe('describeManifestError covers every error tag', () => {
+  it('explains malformed JSON with the parser detail', () => {
+    const message = describeManifestError({ _tag: 'NotJson', detail: 'Unexpected token x' })
+    expect(message).toContain('not valid JSON')
+    expect(message).toContain('Unexpected token x')
+  })
+
+  it('explains a JSON value that is not an object', () => {
+    expect(describeManifestError({ _tag: 'NotAnObject' })).toContain('JSON object at the top level')
+  })
+
+  it('explains an unsupported manifest version, naming both versions', () => {
+    const message = describeManifestError({
+      _tag: 'UnsupportedManifestVersion',
+      found: 2,
+      supported: MANIFEST_VERSION,
+    })
+    expect(message).toContain('manifestVersion 2')
+    expect(message).toContain(`supports ${String(MANIFEST_VERSION)}`)
+  })
+
+  it('explains a missing repositories array', () => {
+    expect(describeManifestError({ _tag: 'RepositoriesNotAnArray' })).toContain('"repositories" array')
+  })
+
+  it('explains an entry that is not an object, by index', () => {
+    expect(describeManifestError({ _tag: 'EntryNotAnObject', index: 3 })).toContain('entry #3 is not an object')
+  })
+
+  it('explains a missing field, by index and field name', () => {
+    const message = describeManifestError({ _tag: 'MissingField', index: 2, field: 'url' })
+    expect(message).toContain('entry #2')
+    expect(message).toContain('"url"')
+  })
+
+  it('explains a URL that clones a different repository than its entry name', () => {
+    const message = describeManifestError({
+      _tag: 'UrlNameMismatch',
+      name: 'mc-kernel',
+      url: 'https://github.com/nerima-games/mc-noise.git',
+      found: 'mc-noise',
+    })
+    expect(message).toContain('entry "mc-kernel"')
+    expect(message).toContain('points at')
+    expect(message).toContain('"mc-noise"')
+  })
+
+  it('explains a repository listed more than once', () => {
+    expect(describeManifestError({ _tag: 'DuplicateRepository', name: 'mc-kernel' })).toContain(
+      '"mc-kernel" more than once',
+    )
+  })
+
+  it('explains a repository outside the roster', () => {
+    const message = describeManifestError({ _tag: 'UnknownRepository', name: 'mc-rogue' })
+    expect(message).toContain('"mc-rogue"')
+    expect(message).toContain('not in the roster')
+  })
+
+  it('explains a repository the roster expects but the manifest omits', () => {
+    const message = describeManifestError({ _tag: 'MissingRepository', name: 'mc-noise' })
+    expect(message).toContain('no entry for "mc-noise"')
+    expect(message).toContain('this workspace manages')
   })
 })
