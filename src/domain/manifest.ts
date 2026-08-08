@@ -248,6 +248,13 @@ export const parseManifest = (raw: string): Parsed<Manifest> => {
     // SHA cannot begin with `-`, so this is redundant today — deliberately. It
     // means loosening PINNED_REF_PATTERN later cannot silently reopen option
     // injection, because this check does not depend on that pattern.
+    //
+    // Structurally unreachable AS LONG AS that stays true: `ref.value` here is
+    // already proven to equal UNPINNED or match PINNED_REF_PATTERN (neither
+    // can start with '-'), so no fixture can drive this arm without breaking
+    // the guarantee above it. Excluded from coverage rather than forced with a
+    // fixture that could only reach it by first weakening `isValidRef`.
+    /* v8 ignore next 3 */
     if (isOptionLike(ref.value)) {
       return fail({ _tag: 'InvalidRef', name: name.value, ref: ref.value })
     }
@@ -390,6 +397,10 @@ export const describeManifestError = (error: ManifestError): string => {
       return `repos.json lists "${error.name}", which is not in the roster (domain/repository-roster.ts).`
     case 'MissingRepository':
       return `repos.json has no entry for "${error.name}", which the roster says this workspace manages.`
+    // Structurally unreachable: every ManifestError tag is handled above, so
+    // TypeScript only accepts this call because `error` has narrowed to
+    // `never`. See src/domain/exhaustive.ts.
+    /* v8 ignore next 2 */
     default:
       return assertUnreachable(error)
   }

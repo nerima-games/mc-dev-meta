@@ -383,6 +383,10 @@ export const applyAction = (
     case 'SkipDirty':
     case 'SkipDiverged':
       return state
+    // Structurally unreachable: every SyncAction tag is handled above, so
+    // TypeScript only accepts this call because `action` has narrowed to
+    // `never`. See src/domain/exhaustive.ts.
+    /* v8 ignore next 2 */
     default:
       return assertUnreachable(action)
   }
@@ -530,6 +534,10 @@ export const gitCommandsFor = (
     case 'SkipDirty':
     case 'SkipDiverged':
       return []
+    // Structurally unreachable: every SyncAction tag is handled above, so
+    // TypeScript only accepts this call because `action` has narrowed to
+    // `never`. See src/domain/exhaustive.ts.
+    /* v8 ignore next 2 */
     default:
       return assertUnreachable(action)
   }
@@ -545,6 +553,10 @@ const describeFetchReason = (reason: FetchReason): string => {
       return 'pinned ref not present locally'
     case 'latest':
       return '--latest: asking origin where its default branch is now'
+    // Structurally unreachable: every FetchReason is handled above, so
+    // TypeScript only accepts this call because `reason` has narrowed to
+    // `never`. See src/domain/exhaustive.ts.
+    /* v8 ignore next 2 */
     default:
       return assertUnreachable(reason)
   }
@@ -574,6 +586,10 @@ export const describeAction = (action: SyncAction): string => {
         `${action.tip.slice(0, 12)}. Nothing was touched. Advancing would strand whatever is only ` +
         'here; push it, or check out the tip yourself if you meant to abandon it.'
       )
+    // Structurally unreachable: every SyncAction tag is handled above, so
+    // TypeScript only accepts this call because `action` has narrowed to
+    // `never`. See src/domain/exhaustive.ts.
+    /* v8 ignore next 2 */
     default:
       return assertUnreachable(action)
   }

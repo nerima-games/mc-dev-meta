@@ -207,6 +207,15 @@ describe('an unpinned entry is fetched but never checked out', () => {
     )
   })
 
+  it('describes the other two fetch reasons distinctly', () => {
+    expect(describeAction({ _tag: 'Fetch', name: 'mc-kernel', reason: 'ref-not-local' })).toContain(
+      'pinned ref not present locally',
+    )
+    expect(describeAction({ _tag: 'Fetch', name: 'mc-kernel', reason: 'latest' })).toContain(
+      "--latest: asking origin where its default branch is now",
+    )
+  })
+
   // REGRESSION: this branch used to answer `Fetch` from EVERY clean state,
   // including one it had just fetched, so the caller's convergence loop ran the
   // fetch again on every round. With `repos.json` shipping 15 unpinned entries
@@ -231,6 +240,52 @@ describe('an unpinned entry is fetched but never checked out', () => {
     const summary = summarise([{ _tag: 'UpToDate', name: 'mc-kernel' }])
     expect(summary.unchanged).toStrictEqual(['mc-kernel'])
     expect(summary.fetched).toStrictEqual([])
+  })
+})
+
+// REGRESSION: `describeAction` is what `pnpm sync` prints for every action it
+// takes, one line per repository. A case with no message test is a line of
+// real CLI output nobody has ever actually checked.
+describe('describeAction names every action distinctly', () => {
+  it('names the pin it will check out immediately after cloning, for a pinned entry', () => {
+    expect(describeAction({ _tag: 'Clone', name: 'mc-kernel', url: pinned.url, ref: SHA_A })).toBe(
+      `clone   mc-kernel <- ${pinned.url} @ ${SHA_A}`,
+    )
+  })
+
+  it('says it will land on the default branch, for an unpinned entry', () => {
+    expect(describeAction({ _tag: 'Clone', name: 'mc-kernel', url: unpinned.url, ref: UNPINNED })).toBe(
+      `clone   mc-kernel <- ${unpinned.url} (unpinned: default branch)`,
+    )
+  })
+
+  it('says which entry it advanced to and why, when the target came from the manifest', () => {
+    expect(
+      describeAction({ _tag: 'Checkout', name: 'mc-kernel', ref: SHA_A, source: 'manifest' }),
+    ).toBe(`checkout mc-kernel @ ${SHA_A}`)
+  })
+
+  it("says it is advancing to origin's tip, and that repos.json has not caught up, when the target came from --latest", () => {
+    const message = describeAction({ _tag: 'Checkout', name: 'mc-kernel', ref: SHA_TIP, source: 'remote' })
+    expect(message).toContain('advance')
+    expect(message).toContain("origin's tip")
+    expect(message).toContain('pnpm update:manifest')
+  })
+
+  it('says an entry is already at its pin, when the target came from the manifest', () => {
+    expect(describeAction({ _tag: 'AlreadyAtRef', name: 'mc-kernel', ref: SHA_A, source: 'manifest' })).toBe(
+      `ok      mc-kernel (already at ${SHA_A})`,
+    )
+  })
+
+  it("says an entry is already at origin's tip, when the target came from --latest", () => {
+    expect(describeAction({ _tag: 'AlreadyAtRef', name: 'mc-kernel', ref: SHA_TIP, source: 'remote' })).toBe(
+      `ok      mc-kernel (already at origin's tip ${SHA_TIP})`,
+    )
+  })
+
+  it('says an unpinned entry was fetched without moving HEAD', () => {
+    expect(describeAction({ _tag: 'UpToDate', name: 'mc-kernel' })).toContain('HEAD left where it was')
   })
 })
 
@@ -594,6 +649,22 @@ describe('the model of what the script does', () => {
       source: 'manifest',
     })
     expect(after).toStrictEqual(present({ head: SHA_A, hasPinnedRef: true }))
+  })
+
+  // REGRESSION: `applyAction` is total over every (state, action) pair, not
+  // just the ones `planSync` would actually produce together. A `Fetch` or
+  // `Checkout` can never be planned against an `Absent` working copy in
+  // practice, but `applyAction` must still answer safely rather than assume
+  // its caller always agrees with `planSync` — the two are asserted separately
+  // (test/sync-plan.test.ts's exhaustive sweep) precisely so neither can drift
+  // without the other noticing, which only works if both sides are total.
+  it('leaves an absent working copy absent, even if asked to fetch or check out', () => {
+    expect(applyAction(pinned, absent, { _tag: 'Fetch', name: 'mc-kernel', reason: 'ref-not-local' })).toBe(
+      absent,
+    )
+    expect(
+      applyAction(pinned, absent, { _tag: 'Checkout', name: 'mc-kernel', ref: SHA_A, source: 'manifest' }),
+    ).toBe(absent)
   })
 
   it('models the no-op actions as changing nothing', () => {

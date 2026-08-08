@@ -291,6 +291,10 @@ const membersOf = (body: string): ReadonlyArray<TypeMember> => {
       continue
     }
     const name = match[1]
+    // Structurally unreachable: MEMBER_ANCHOR's name group is a mandatory
+    // (non-optional) pattern, so a successful match has always captured it.
+    // TypeScript's regex typing does not encode "this group is unconditional".
+    /* v8 ignore next 3 */
     if (name === undefined) {
       continue
     }
@@ -448,6 +452,12 @@ const readVariantBodies = (
     }
 
     const next = skipOperand(blanked, cursor)
+    // Structurally unreachable: `cursor` reaches here only after `skipBlank`
+    // has consumed all whitespace (including '\n') and the '|', '&', ';', '{'
+    // and empty-string cases above have all been ruled out, so the character
+    // `skipOperand` starts on can never be one of ITS OWN depth-0 stop
+    // characters — it always advances by at least one position.
+    /* v8 ignore next 3 */
     if (next <= cursor) {
       return { bodies, unterminated: false }
     }
@@ -481,6 +491,11 @@ export const declaredTypes = (text: string): ShapeResult<ReadonlyMap<string, Typ
     const exported = match[1] !== undefined
     const keyword = match[2]
     const name = match[3]
+    // Structurally unreachable: DECLARATION's keyword and name groups are
+    // both mandatory (non-optional) patterns, so a successful match has
+    // always captured both. TypeScript's regex typing does not encode "this
+    // group is unconditional".
+    /* v8 ignore next 3 */
     if (keyword === undefined || name === undefined) {
       continue
     }
@@ -581,6 +596,10 @@ export const parseApiLock = (markdown: string): ReadonlyArray<ApiLockEntry> => {
     if (heading !== null) {
       const name = heading[1]
       const kind = heading[2]
+      // The `: undefined` fallback is structurally unreachable: both of
+      // ENTRY_HEADING's groups are mandatory (non-optional) patterns, so a
+      // successful match has always captured both.
+      /* v8 ignore next */
       pending = name !== undefined && kind !== undefined ? { name, kind } : undefined
       continue
     }

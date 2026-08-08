@@ -415,6 +415,12 @@ export const parseDiagnostics = (output: string): ReadonlyArray<Diagnostic> =>
         return []
       }
       const [, file, line, column, code, message] = match
+      // Structurally unreachable: `DIAGNOSTIC_LINE` has no optional capture
+      // group, so a successful `match` (checked above) has already captured
+      // all five. TypeScript's `RegExpExecArray` typing does not encode that
+      // a group is unconditional, hence the check — but no input can drive
+      // this arm without DIAGNOSTIC_LINE itself gaining an optional group.
+      /* v8 ignore next 9 */
       if (
         file === undefined ||
         line === undefined ||

@@ -400,6 +400,81 @@ describe('a changed brand refinement fails, and names the samples it disagrees o
   it('does not report the samples the two agree on', () => {
     expect(rendered(drifted)).not.toContain('0.016:')
   })
+
+  // REGRESSION: a mirror's refinement can be missing a verdict for a sample
+  // altogether (an incomplete probe), which is a different fact from
+  // "rejected" and must not be reported as agreement, disagreement, or a
+  // crash — the comparison has to say plainly that the mirror was never asked.
+  it('reports "not probed" when the mirror is missing a verdict the source has', () => {
+    const missingOneSample: MirrorObservation = {
+      ...agreeingMirror,
+      values: agreeingMirror.values.map((value) =>
+        value.name === 'ChunkAxis'
+          ? {
+              _tag: 'Refinement',
+              name: 'ChunkAxis',
+              verdicts: REFINEMENT_SAMPLES.filter((sample) => sample.label !== '0').map((sample) => ({
+                sample: sample.label,
+                verdict:
+                  typeof sample.value !== 'number'
+                    ? 'threw'
+                    : Number.isFinite(sample.value) && sample.value >= 0
+                      ? 'accepted'
+                      : 'rejected',
+              })),
+            }
+          : value,
+      ),
+    }
+
+    expect(rendered(missingOneSample)).toContain('0: mirror not probed, mc-worldgen accepted')
+  })
+})
+
+describe('a value whose KIND differs fails even when nothing else does', () => {
+  // REGRESSION: `_tag` records the SHAPE of an export (`Scalar`, `TagKey`,
+  // `Refinement`, `Opaque`), independently of its content. `ScalarDiffers`,
+  // `TagKeyDiffers` and `RefinementDiffers` all assume the two sides already
+  // agree on shape and never run at all when they do not — a mirror that
+  // turned a Context.Tag into a plain constant is invisible to every one of
+  // them unless this check exists.
+  it('reports a mismatch between a Scalar mirror and a TagKey source', () => {
+    const drifted = withValues([{ _tag: 'Scalar', name: 'ChunkStore', rendered: '0' }])
+
+    expect(findingsFor(drifted)).toStrictEqual([
+      { _tag: 'KindDiffers', symbol: 'ChunkStore', mirror: 'a scalar', source: 'a Context.Tag' },
+    ])
+  })
+
+  it('names both kinds in the message', () => {
+    const drifted = withValues([{ _tag: 'Scalar', name: 'ChunkStore', rendered: '0' }])
+
+    expect(rendered(drifted)).toContain('ChunkStore is a scalar here and a Context.Tag in mc-worldgen.')
+  })
+
+  it('reports a mismatch involving a Refinement, naming it a Brand refinement', () => {
+    const drifted = withValues([{ _tag: 'Scalar', name: 'ChunkAxis', rendered: '0' }])
+
+    expect(findingsFor(drifted)).toStrictEqual([
+      { _tag: 'KindDiffers', symbol: 'ChunkAxis', mirror: 'a scalar', source: 'a Brand refinement' },
+    ])
+  })
+
+  it('reports a mismatch between two Opaque exports of a different kind', () => {
+    const mirror: MirrorObservation = {
+      ...agreeingMirror,
+      values: [...agreeingMirror.values, { _tag: 'Opaque', name: 'DEFAULT_LAYER', kind: 'Layer factory' }],
+    }
+    const source: SourceObservation = {
+      ...agreeingSource,
+      values: [...agreeingSource.values, { _tag: 'Opaque', name: 'DEFAULT_LAYER', kind: 'plain function' }],
+      published: new Set([...agreeingSource.published, 'DEFAULT_LAYER']),
+    }
+
+    expect(compareSurfaces(spec, mirror, source)).toStrictEqual([
+      { _tag: 'KindDiffers', symbol: 'DEFAULT_LAYER', mirror: 'a Layer factory', source: 'a plain function' },
+    ])
+  })
 })
 
 describe('a wrong capability id fails, and names the id and the block', () => {
@@ -669,6 +744,63 @@ describe('the property probes the registry actually carries', () => {
     })
   })
 
+  it('explains why an unpublished mirrored symbol matters', () => {
+    const message = describeMirrorFinding(spec, { _tag: 'SymbolNotPublished', symbol: 'opacityOfBlockId' })
+
+    expect(message).toContain('opacityOfBlockId is mirrored')
+    expect(message).toContain('does not export it from its')
+    expect(message).toContain('will not compile')
+  })
+
+  // A CAPABILITY probe row is the opposite case, and deliberately so (see the
+  // header comment above `mirrorPath`): the predicate it names belongs to a
+  // THIRD repository (mc-kernel here, not mc-worldgen), so it is never on
+  // `source`'s own barrel and the barrel comparison must not fire for it.
+  // Uses a REAL row from `DECLARED_DIVERGENCES` — not a fabricated subject —
+  // so this pins the actual wiring between the registry and the comparison,
+  // not just the shape of the skip.
+  it('exempts a value named in DECLARED_DIVERGENCES from the value comparison', () => {
+    const divergence = DECLARED_DIVERGENCES.find((entry) => entry.subject === 'BLOCK_DROP_REGISTRY')
+    if (divergence === undefined) {
+      throw new Error('fixture assumes DECLARED_DIVERGENCES still has a BLOCK_DROP_REGISTRY entry')
+    }
+    const divergentSpec: MirrorSpec = {
+      repository: divergence.repository,
+      file: divergence.file,
+      source: 'mc-kernel',
+      renamedTypes: [],
+      capabilities: [],
+      properties: [],
+    }
+    const mirror: MirrorObservation = {
+      values: [{ _tag: 'Opaque', name: 'BLOCK_DROP_REGISTRY', kind: 'table' }],
+      types: [],
+      capabilities: [],
+      properties: [],
+      probeableColumns: [],
+    }
+    // `published` needs at least one entry, or `compareSurfaces` reads the
+    // whole comparison as "nothing to compare against" before it ever reaches
+    // the value loop — a different, already-tested guard (see "an empty
+    // observation is a failure" below). `SOMETHING_ELSE` keeps that guard out
+    // of the way without being the thing under test.
+    const source: SourceObservation = { values: [], types: [], published: new Set(['SOMETHING_ELSE']) }
+
+    // BLOCK_DROP_REGISTRY itself is not published on the source and has no
+    // counterpart — without the divergence exemption this would be
+    // `SymbolNotPublished`.
+    expect(compareSurfaces(divergentSpec, mirror, source)).toStrictEqual([])
+  })
+
+  it('exempts a probed CAPABILITY symbol from the barrel comparison, unlike a probed property', () => {
+    const mirror: MirrorObservation = {
+      ...agreeingMirror,
+      values: [...agreeingMirror.values, { _tag: 'Opaque', name: 'isReplaceable', kind: 'predicate' }],
+    }
+
+    expect(compareSurfaces(spec, mirror, agreeingSource)).toStrictEqual([])
+  })
+
   it('gives every spec a property array, so a missing one cannot read as empty', () => {
     for (const entry of MIRROR_SPECS) {
       expect(Array.isArray(entry.properties), `${entry.repository}/${entry.file}`).toBe(true)
@@ -739,6 +871,61 @@ describe('type shape', () => {
     }
 
     expect(rendered(drifted)).toContain('missing the arm "OutOfWorld"')
+  })
+
+  it('fails when the mirror has an EXTRA arm the source does not have', () => {
+    const drifted: MirrorObservation = {
+      ...agreeingMirror,
+      types: [
+        ...agreeingMirror.types.slice(0, 2),
+        union('BlockReading', [
+          ['Block', ['_tag', 'block']],
+          ['ChunkNotLoaded', ['_tag']],
+          ['OutOfWorld', ['_tag']],
+          ['Bedrock', ['_tag']],
+        ]),
+      ],
+    }
+
+    expect(findingsFor(drifted)).toContainEqual({
+      _tag: 'VariantNotInSource',
+      type: 'BlockReading',
+      variant: 'Bedrock',
+    })
+    expect(rendered(drifted)).toContain('declares the arm "Bedrock"')
+  })
+
+  // Uses a REAL row from `DECLARED_DIVERGENCES` — see the value-level test
+  // above for why a fabricated subject would not pin the same thing.
+  it('exempts a type named in DECLARED_DIVERGENCES from the shape comparison entirely', () => {
+    const divergence = DECLARED_DIVERGENCES.find((entry) => entry.subject === 'BlockDropRegistryEntry')
+    if (divergence === undefined) {
+      throw new Error('fixture assumes DECLARED_DIVERGENCES still has a BlockDropRegistryEntry entry')
+    }
+    const divergentSpec: MirrorSpec = {
+      repository: divergence.repository,
+      file: divergence.file,
+      source: 'mc-kernel',
+      renamedTypes: [],
+      capabilities: [],
+      properties: [],
+    }
+    const mirror: MirrorObservation = {
+      values: [],
+      types: [shape('BlockDropRegistryEntry', [['id', false]])],
+      capabilities: [],
+      properties: [],
+      probeableColumns: [],
+    }
+    // A shape with the SAME name but a totally different member set — if the
+    // divergence were not exempting it, this would fail on every member.
+    const source: SourceObservation = {
+      values: [],
+      types: [shape('BlockDropRegistryEntry', [['definition', false], ['id', false], ['type', false]])],
+      published: new Set(['BlockDropRegistryEntry']),
+    }
+
+    expect(compareSurfaces(divergentSpec, mirror, source)).toStrictEqual([])
   })
 
   it('matches union arms by their tag, not by their position', () => {
@@ -1116,6 +1303,42 @@ describe('the committed KNOWN_FINDINGS register', () => {
   })
 })
 
+// REGRESSION: every ternary in `describeMirrorFinding` has two messages, and
+// only one of each pair was ever actually printed by another test in this
+// file. Called directly with a hand-built finding, the same way the
+// InvalidUrl and SymbolNotPublished message tests above do — the finding
+// values themselves are already pinned by the `findingsFor` tests; this only
+// pins the OTHER half of each message.
+describe('describeMirrorFinding covers the other half of every two-sided message', () => {
+  it('names the mirror-side name too, when a renamed type is not published under its source name', () => {
+    const message = describeMirrorFinding(spec, {
+      _tag: 'TypeNotPublished',
+      type: 'WorldgenChunk',
+      lookedFor: 'Chunk',
+    })
+    expect(message).toContain('the type WorldgenChunk (looked up as Chunk)')
+  })
+
+  it('says the shape exists on the mirror but not the source, the other direction from the existing test', () => {
+    const message = describeMirrorFinding(spec, {
+      _tag: 'ShapeNotComparable',
+      type: 'ChunkStoreApi',
+      objectInMirror: true,
+    })
+    expect(message).toContain('ChunkStoreApi is an object type here but not in mc-worldgen.')
+  })
+
+  it('says a member is required here and optional in the source, the other direction from the existing test', () => {
+    const message = describeMirrorFinding(spec, {
+      _tag: 'OptionalityDiffers',
+      type: 'ChunkStoreApi',
+      member: 'setBlock',
+      mirrorOptional: false,
+    })
+    expect(message).toContain('setBlock is required here and optional in mc-worldgen.')
+  })
+})
+
 describe('the report as a whole', () => {
   const failing = compareMirror(
     spec,
@@ -1156,6 +1379,14 @@ describe('the report as a whole', () => {
 
     expect(report).toContain('Neither repository can see this on its own')
     expect(report).toContain('DECLARED_DIVERGENCES')
+  })
+
+  it('omits the id-reading count entirely when no property was probed at all', () => {
+    const noProperties = compareMirror(spec, { ...agreeingMirror, properties: [] }, agreeingSource, [])
+    const report = describeMirrorRun([noProperties]).join('\n')
+
+    expect(report).toContain('0 property probe(s)')
+    expect(report).not.toContain('id reading(s)')
   })
 })
 
@@ -1222,6 +1453,15 @@ describe('which checkout this gate read', () => {
   it('says a dirty working copy is not any revision at all', () => {
     expect(describeProvenance([row({ dirty: true })]).join('\n')).toContain(
       'uncommitted changes',
+    )
+  })
+
+  it('names an unreadable HEAD and an unpinned entry, rather than printing "undefined"', () => {
+    expect(describeProvenance([row({ name: 'mc-noise', head: undefined })]).join('\n')).toContain(
+      'mc-noise  disk unreadable',
+    )
+    expect(describeProvenance([row({ name: 'mc-save', pinned: undefined })]).join('\n')).toContain(
+      'pinned unpinned',
     )
   })
 

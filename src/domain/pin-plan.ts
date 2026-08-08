@@ -163,6 +163,10 @@ export const describePinDecision = (decision: PinDecision): string => {
       return decision.source === 'remote'
         ? `  pin      ${decision.name} @ ${decision.ref} (origin's tip; run \`pnpm sync\` to move repos/ onto it)`
         : `  pin      ${decision.name} @ ${decision.ref}`
+    // Structurally unreachable: every PinDecision tag is handled above, so
+    // TypeScript only accepts this call because `decision` has narrowed to
+    // `never`. See src/domain/exhaustive.ts.
+    /* v8 ignore next 2 */
     default:
       return assertUnreachable(decision)
   }

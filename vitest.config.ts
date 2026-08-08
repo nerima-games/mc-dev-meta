@@ -34,7 +34,22 @@ export default defineConfig({
       // scripts/ is deliberately NOT covered: it is the impure shell, and the
       // only way to cover it would be to run real git against real
       // repositories. Its decisions live in domain/ and are covered there.
-      exclude: ['**/*.d.ts', '**/*.config.ts', '**/*.test.ts', '**/*.spec.ts', 'repos/**', 'scripts/**'],
+      //
+      // domain/exhaustive.ts's `assertUnreachable` throw is deliberately NOT
+      // covered either: TypeScript only lets a caller reach it once every
+      // other case of a union has been handled, so a real call site can never
+      // execute it. The only way to "cover" it would be an `as never` cast
+      // manufacturing a value that cannot occur, which would assert nothing
+      // real about this codebase — it would only prove the cast works.
+      exclude: [
+        '**/*.d.ts',
+        '**/*.config.ts',
+        '**/*.test.ts',
+        '**/*.spec.ts',
+        'repos/**',
+        'scripts/**',
+        'src/domain/exhaustive.ts',
+      ],
       all: true,
       reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',

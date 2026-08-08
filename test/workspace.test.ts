@@ -89,6 +89,13 @@ describe('partial and complete workspaces', () => {
     expect(plan.missing).toStrictEqual([])
   })
 
+  it('explains a complete workspace by naming the command and the repository count', () => {
+    const plan = planWorkspaceRun(threeRepos, ['mc-save', 'mc-kernel', 'mc-noise'])
+    const lines = describeWorkspaceRun(plan, 'verify').join('\n')
+
+    expect(lines).toContain('running "verify" in all 3 repositories')
+  })
+
   // REGRESSION: output order must not depend on readdir order, which differs
   // between filesystems. A workspace run that reports repositories in a
   // different order on macOS and Linux is a diff nobody can read.
@@ -126,6 +133,15 @@ describe('directories the manifest does not know about', () => {
   it('sorts unmanaged directories so the warning is stable', () => {
     const plan = planWorkspaceRun(threeRepos, ['zzz', 'aaa', 'mc-kernel'])
     expect(plan.unmanaged).toStrictEqual(['aaa', 'zzz'])
+  })
+
+  it('pluralises the warning when more than one unmanaged directory is present', () => {
+    const lines = describeWorkspaceRun(
+      planWorkspaceRun(threeRepos, ['mc-kernel', 'mc-renamed-away', 'scratch']),
+      'verify',
+    ).join('\n')
+
+    expect(lines).toContain('contains 2 directories not in repos.json')
   })
 })
 

@@ -106,6 +106,10 @@ export const describeWorkspaceRun = (plan: WorkspaceRunPlan, command: string): R
         `workspace: running "${command}" in all ${String(plan.targets.length)} repositories.`,
       )
       break
+    // Structurally unreachable: every WorkspaceStatus is handled above, so
+    // TypeScript only accepts this call because `plan.status` has narrowed to
+    // `never`. See src/domain/exhaustive.ts.
+    /* v8 ignore next 2 */
     default:
       assertUnreachable(plan.status)
   }

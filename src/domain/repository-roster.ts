@@ -245,9 +245,20 @@ export const buildOrder = (): ReadonlyArray<string> | undefined => {
     const ready = REPOSITORY_NAMES.filter(
       (name) =>
         remaining.has(name) &&
+        // `?? []` is structurally unreachable: DEPENDENCY_GRAPH is built as
+        // one entry per REPOSITORY_NAMES member (see its definition above),
+        // so `.get(name)` for any name drawn from REPOSITORY_NAMES is always
+        // defined.
+        /* v8 ignore next */
         [...(DEPENDENCY_GRAPH.get(name) ?? [])].every((dependency) => !remaining.has(dependency)),
     )
 
+    // Structurally unreachable with the committed roster, which is acyclic by
+    // construction (that is the whole claim the doc comment above makes).
+    // `buildOrder` takes no parameters, so there is no way to drive this arm
+    // without a genuinely cyclic DEPENDENCY_GRAPH, which would itself be the
+    // bug this branch exists to catch.
+    /* v8 ignore next 3 */
     if (ready.length === 0) {
       return undefined
     }
