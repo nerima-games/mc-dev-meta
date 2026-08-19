@@ -1,8 +1,6 @@
 /**
  * `pnpm check:workspace` — run one pnpm script across every cloned repository.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * The empty workspace must work
  * ---------------------------------------------------------------------------

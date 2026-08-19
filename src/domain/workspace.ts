@@ -1,8 +1,6 @@
 /**
  * Planning a workspace-wide check run. PURE.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * The empty workspace is the normal case, not an error
  * ---------------------------------------------------------------------------
@@ -109,7 +107,7 @@ export const describeWorkspaceRun = (plan: WorkspaceRunPlan, command: string): R
     // Structurally unreachable: every WorkspaceStatus is handled above, so
     // TypeScript only accepts this call because `plan.status` has narrowed to
     // `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       assertUnreachable(plan.status)
   }

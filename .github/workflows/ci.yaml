@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "pnpm"
           # pnpm-lock.yaml is gitignored — see .gitignore for why a
           # workspace-root lockfile describing gitignored packages is not a
@@ -44,21 +44,14 @@ jobs:
           cache-dependency-path: package.json
 
       - name: Install dependencies
-        # --ignore-scripts: pnpm 9 runs postinstall, and a fork PR can edit
-        # package.json and the lockfile consistently and still satisfy
-        # --frozen-lockfile. Nothing here needs a lifecycle script. This is the
-        # check that actually protects the runner, and it is unaffected by the
-        # line below.
+        # --ignore-scripts prevents dependency lifecycle code from running in a
+        # fork PR. Nothing here needs a lifecycle script.
         #
         # No --frozen-lockfile: there is no committed lockfile to be frozen
-        # against. The honest cost is that a CI run resolves devDependencies
-        # afresh, so a bad release inside the caret ranges in package.json can
-        # turn this workflow red on a day nothing here changed. That is a real
-        # cost and it is accepted deliberately: the alternative was committing a
-        # file that is dirty on every developer's machine by construction. If
-        # this floats often enough to be annoying, pin the six devDependencies
-        # to exact versions in package.json — that is the fix, not un-ignoring
-        # the lockfile.
+        # against. Direct devDependencies are exact-pinned in package.json, so
+        # only transitive dependencies resolve afresh. The workspace-root lockfile
+        # is intentionally ignored because its contents change when repos/ is
+        # populated; see .gitignore.
         run: pnpm install --ignore-scripts
 
       - name: Type check
@@ -74,6 +67,9 @@ jobs:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
+      - name: Evaluate Nix flake
+        run: nix flake check --no-write-lock-file --no-build --all-systems
+
       - name: Lint
         run: nix develop --command pnpm lint
 
@@ -87,6 +83,17 @@ jobs:
       - name: Workspace check on an empty repos/
         run: pnpm check:workspace
 
+      # The feature catalog belongs to this repository. Missing downstream
+      # checkouts are reported as reasoned skips, so this remains useful in CI.
+      - name: Feature inventory
+        run: pnpm check:features
+
+      # Portable data contracts are compared against checked-out runtime
+      # implementations when they are present. An empty repos/ is a reasoned
+      # skip, so this remains safe for the meta repository's normal CI checkout.
+      - name: Portable contract parity
+        run: pnpm check:portable
+
       - name: Sync plan on an empty repos/ (dry run — touches nothing)
         run: pnpm sync:dry
 
@@ -99,7 +106,13 @@ jobs:
       - name: Mirror check
         run: pnpm check:mirrors
 
-      # 4-metric 99% coverage gate (TEST_STANDARD.md §3), applied org-wide with
+      # Repointing is a separate cross-repository contract: it removes each
+      # mirror in a disposable copy and asks the source package to satisfy the
+      # resulting imports. Empty repos/ is a valid skip, just like Mirror check.
+      - name: Repoint check
+        run: pnpm check:repoint
+
+      # 4-metric 100% coverage gate (TEST_STANDARD.md §3), applied org-wide with
       # no staged rollout. Thresholds live in vitest.config.ts; `vitest run
       # --coverage` itself exits non-zero when a metric falls short.
       - name: Coverage

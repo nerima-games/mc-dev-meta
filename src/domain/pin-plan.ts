@@ -166,7 +166,7 @@ export const describePinDecision = (decision: PinDecision): string => {
     // Structurally unreachable: every PinDecision tag is handled above, so
     // TypeScript only accepts this call because `decision` has narrowed to
     // `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       return assertUnreachable(decision)
   }

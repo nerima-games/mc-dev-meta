@@ -46,9 +46,9 @@
             ];
 
             shellHook = ''
-              mkdir -p "$PWD/.corepack"
-              corepack enable --install-directory "$PWD/.corepack"
-              export PATH="$PWD/.corepack:$PATH"
+              mcDevMetaCorepackDir="$(mktemp -d "''${TMPDIR:-/tmp}/mc-dev-meta-corepack.XXXXXX")"
+              corepack enable --install-directory "$mcDevMetaCorepackDir"
+              export PATH="$mcDevMetaCorepackDir:$PATH"
             '';
           };
         }

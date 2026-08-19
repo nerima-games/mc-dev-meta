@@ -5,14 +5,8 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        maxForks: '50%',
-        minForks: 1,
-        isolate: true,
-        singleFork: false,
-      },
-    },
+    maxWorkers: '50%',
+    isolate: true,
     include: ['test/**/*.test.ts'],
     // `repos/` holds 15 separate projects with their own test suites. Running
     // them from here would be `pnpm check:workspace`'s job, not vitest's.
@@ -50,21 +44,13 @@ export default defineConfig({
         'scripts/**',
         'src/domain/exhaustive.ts',
       ],
-      all: true,
       reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
-      // TEST_STANDARD.md §3: the 4-metric 99% gate is an org-wide decision
-      // applied immediately to all 16 repositories, with no staged rollout and
-      // no per-repository exemption for being "not done yet" — a low number is
-      // a reason for CI to go red, not a reason to withhold the gate.
-      //
-      // Measured at migration time (`pnpm test:coverage`): statements 93.78%,
-      // branches 89.19%, functions 97.82%, lines 93.78%. This does NOT clear
-      // 99% on 3 of the 4 metrics, so enabling this turns CI red here, the same
-      // known-and-accepted way it does for mc-audio / mc-compose /
-      // mc-playground-kit (TEST_STANDARD.md §4). That is expected, not a
-      // reason to defer.
-      thresholds: { branches: 99, functions: 99, lines: 99, statements: 99 },
+      // TEST_STANDARD.md §3: keep the four-metric gate enabled for the domain
+      // source covered by this suite. Script behavior is exercised by the
+      // executable workspace, mirror, and repoint checks instead of being
+      // counted as pure domain coverage.
+      thresholds: { branches: 100, functions: 100, lines: 100, statements: 100 },
     },
   },
   esbuild: {
