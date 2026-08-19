@@ -2,23 +2,20 @@
  * Cross-repository mirror verification: the decision half. PURE — no
  * filesystem, no dynamic import, no dependencies.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * The defect this exists to catch
  * ---------------------------------------------------------------------------
  *
- * Nothing is published yet (plan.md §6 Step 3 publishes bottom-up), so several
- * repositories carry HAND-WRITTEN MIRRORS of declarations they will eventually
- * import:
+ * Several repositories still carry HAND-WRITTEN MIRRORS of declarations they
+ * will eventually import. Published packages are removed from this register
+ * as their consumers switch to direct imports:
  *
  *   domain/kernel-vocabulary.ts   mc-sim, mc-render, mc-playground-kit,
- *                                 mc-compose, mc-worldgen   <- mc-kernel
+ *                                 mc-compose                  <- mc-kernel
  *   domain/frame-contract.ts      mx-gameplay, mx-redstone, mx-ui  <- mc-kernel
  *   domain/block-vocabulary.ts    mx-gameplay               <- mc-kernel
- *   domain/chunk-store-port.ts    mx-gameplay               <- mc-worldgen
  *
- * Each mirroring repository has a `*-mirror.test.ts` that pins its mirror's
+ * Each remaining mirroring repository has a `*-mirror.test.ts` that pins its mirror's
  * shape in both directions and asserts the `Context.Tag` key literally. Those
  * tests are worth having and they are NOT this. THEY PIN THE TRANSCRIPTION, NOT
  * THE SOURCE. They cannot see the original, because the original lives in
@@ -103,6 +100,8 @@
  */
 
 import { assertUnreachable } from './exhaustive'
+import { compareRosters } from './mirror-roster'
+import type { RosterFinding, RosterObservation, RosterProbe } from './mirror-roster'
 import type { TypeShape, TypeVariant } from './type-shape'
 
 // ---------------------------------------------------------------------------
@@ -150,15 +149,16 @@ export type CapabilityProbe = {
  * `propertyOfBlockId`. A probe array with capability rows and no property rows
  * therefore compares one half of kernel's block model and reports on both.
  *
- * THAT IS NOT A HYPOTHETICAL AND IT COST A REAL DEFECT. mc-worldgen's
- * `domain/kernel-vocabulary.ts` transcribed SIX non-opaque rows while kernel's
- * registry carried twenty-four; the missing eighteen — a ladder, a cobweb,
- * eleven plants, two rails, a cactus, a pressure plate and a slab — all fell
- * through to the `'opaque'` default. That is the DARK direction, which
+ * THAT WAS NOT A HYPOTHETICAL. Before mc-worldgen moved to a direct kernel
+ * dependency, its `domain/kernel-vocabulary.ts` transcribed SIX non-opaque rows
+ * while kernel's registry carried twenty-four; the missing eighteen — a ladder,
+ * a cobweb, eleven plants, two rails, a cactus, a pressure plate and a slab —
+ * all fell through to the `'opaque'` default. That is the DARK direction, which
  * mc-worldgen's DN-7 names as the NON-conservative one: a cell read darker than
  * it is lets a hostile mob spawn where `hostile-spawn.ts` would have refused.
- * Nothing caught it, because generated terrain only ever writes ids 0-10 — the
+ * Nothing caught it, because generated terrain only ever wrote ids 0-10 — the
  * defect was reachable only through a PLACED block, so no golden fixture moved.
+ * The direct dependency removed that transcription and its registry row.
  *
  * kernel's audit §4.9.1(d) already states the rule this violated:
  * 「ミラーが転記している能力の数より probe が少なければ、そのチェックは検査して
@@ -213,6 +213,8 @@ export type MirrorSpec = {
    * probe nothing and be reported as agreement.
    */
   readonly properties: ReadonlyArray<PropertyProbe>
+  /** Closed ordered lists whose membership is part of the mirrored contract. */
+  readonly rosters: ReadonlyArray<RosterProbe>
 }
 
 /**
@@ -226,52 +228,14 @@ export type MirrorSpec = {
  */
 export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
   {
-    repository: 'mc-sim',
+    repository: 'mc-render',
     file: 'domain/kernel-vocabulary.ts',
     source: 'mc-kernel',
     renamedTypes: [],
-    // EMPTY AND CORRECT, for the reason mc-worldgen's row is not: this mirror
-    // transcribes no capability FLAG and no property COLUMN. Its header states
-    // the boundary — `block-item.ts` and `block-registry.ts`'s drop resolution
-    // are deliberately not mirrored, because "what does breaking this block give
-    // you" is mx-gameplay's verb. There is no block table here to probe, so a
-    // probe row would be inventing data the file does not carry.
     capabilities: [],
     properties: [],
-    // ---------------------------------------------------------------------
-    // BUT THIS ROW HAS A BLIND SPOT OF THE SAME SHAPE, AND IT HAS ALREADY COST
-    // SOMETHING. It is recorded here because the row above looks complete.
-    // ---------------------------------------------------------------------
-    //
-    // What this mirror carries that neither probe kind covers is a ROSTER:
-    // `ITEM_TYPES`, a closed literal union whose MEMBERSHIP IS THE TYPE.
-    // `observeValue` in `scripts/check-mirrors.ts` reduces an array to
-    // `Opaque{kind:'object'}`, so this gate compares "both sides export an
-    // object called ITEM_TYPES" and nothing whatever about what is in it.
-    //
-    // That is not a hypothesis. This mirror sat at 23 literals while kernel's
-    // roster was 97 — seventy-four missing — and `check:mirrors` reported
-    //
-    //   ok    mc-sim/domain/kernel-vocabulary.ts vs mc-kernel — 14 value(s) ...
-    //
-    // on every run of that period. It was `pnpm check:repoint` that found it, by
-    // deleting a mirror and typechecking against the real module, and it showed
-    // up as a TS2345 at the mx-gameplay seam rather than as anything mc-sim or
-    // this gate could see.
-    //
-    // kernel's audit §4.9.1(d) is the rule already on the books —
-    // 「ミラーが転記している能力の数より probe が少なければ、そのチェックは検査
-    // していない成功を報告する」 — and a roster compared as `typeof === 'object'`
-    // is that sentence with `capability` replaced by `member`. The fix is a third
-    // probe kind (a roster probe: read both arrays, compare element-wise and in
-    // order) and it is deliberately NOT attempted in the same change that fixed
-    // the roster itself, because it alters `MirrorSpec` for all eleven specs.
-    //
-    // Until it exists, `mc-sim/test/kernel-mirror.test.ts` pins the roster from
-    // inside mc-sim and `check:repoint` catches it from outside; neither is this
-    // gate, and this gate should not be read as covering it.
+    rosters: [],
   },
-  { repository: 'mc-render', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
   {
     repository: 'mc-render',
     file: 'domain/lod-vocabulary.ts',
@@ -292,164 +256,61 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     // over a closed union rather than a lookup over 120 block ids.
     capabilities: [],
     properties: [],
+    rosters: [],
   },
-  { repository: 'mc-playground-kit', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
-  { repository: 'mc-compose', file: 'domain/kernel-vocabulary.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
   {
-    repository: 'mc-worldgen',
+    repository: 'mc-playground-kit',
     file: 'domain/kernel-vocabulary.ts',
     source: 'mc-kernel',
     renamedTypes: [],
-    // EMPTY AND CORRECT. This mirror's own header states the boundary it keeps:
-    // it asks kernel the two questions a light grid requires and no others, so
-    // it deliberately does not restate a single capability FLAG. Deciding that a
-    // byte falls when unsupported is a rule, and rules are mx-gameplay's.
     capabilities: [],
-    // THE FIRST PROPERTY PROBES IN THIS LIST, and this is the mirror that paid
-    // for them. Its header names the gap in the first person — 「`lightEmission`
-    // and `opacity` are PROPERTIES, and that probe has no property half」 — and
-    // then records what the gap cost: the opacity table below it kept six rows
-    // out of kernel's twenty-four for a full week, so `./light.ts` treated a
-    // ladder, a rail, a flower, a cactus and a slab as fully light-blocking.
-    //
-    // The mirror's answer at the time was to make its OWN test exhaustive over
-    // kernel's id range, and its header is honest about why that is not enough:
-    // 「this file's correctness is checked by a test that this repository could
-    // edit in the same commit that breaks it」. These two rows are the structural
-    // fix it asked for. They read kernel's table at runtime, in the one build
-    // where both packages exist, so no edit in mc-worldgen can make them agree.
-    properties: [
-      { mirrorExport: 'opacityOfBlockId', owner: 'mc-kernel', property: 'opacity' },
-      { mirrorExport: 'lightEmissionOfBlockId', owner: 'mc-kernel', property: 'lightEmission' },
-    ],
-    // `transmitsLight` is NOT probed and its absence is a decision rather than an
-    // oversight. Both sides define it as `opacityOfBlockId(id) !== 'opaque'`, so
-    // it is a projection of a column already compared here id for id: it cannot
-    // disagree unless `opacity` does, and if `opacity` does then this probe
-    // already names the id. A row for it would add a second failure line per
-    // defect and no reachable defect of its own.
+    properties: [],
+    rosters: [],
   },
-  { repository: 'mx-gameplay', file: 'domain/frame-contract.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
-  { repository: 'mx-redstone', file: 'domain/frame-contract.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
-  { repository: 'mx-ui', file: 'domain/frame-contract.ts', source: 'mc-kernel', renamedTypes: [], capabilities: [], properties: [] },
+  {
+    repository: 'mc-compose',
+    file: 'domain/kernel-vocabulary.ts',
+    source: 'mc-kernel',
+    renamedTypes: [],
+    capabilities: [],
+    properties: [],
+    rosters: [],
+  },
   {
     repository: 'mx-gameplay',
-    file: 'domain/chunk-store-port.ts',
-    source: 'mc-worldgen',
-    // The mirror calls mc-worldgen's `Chunk` "WorldgenChunk", because
-    // mx-gameplay has its own notion of a chunk-shaped thing and did not want
-    // to shadow it. A rename is not drift; an unrecorded rename would be.
-    renamedTypes: [{ mirror: 'WorldgenChunk', source: 'Chunk' }],
-    // EMPTY, AND THAT IS THE FIX. This file used to carry three capability
-    // probes and its repository used to export four capability predicates —
-    // mc-KERNEL's flags, in a mirror of MC-WORLDGEN. See the note below
-    // `MIRROR_SPECS` on what that combination hid. The predicates are in
-    // `domain/block-vocabulary.ts` now and so are their probes.
+    file: 'domain/frame-contract.ts',
+    source: 'mc-kernel',
+    renamedTypes: [],
     capabilities: [],
-    // Empty for the same reason, and checked rather than assumed: this file
-    // mirrors mc-worldgen, and mc-worldgen owns no block table at all. A
-    // property row here would be the same misplacement the note below records.
     properties: [],
+    rosters: [],
   },
   {
-    // The FIRST mc-sim mirror this list has ever carried, and the reason it is
-    // worth saying so: `mx-gameplay/domain/entity-manager-port.ts` has mirrored
-    // mc-sim since the mob wiring landed and is not in this list, so until now
-    // every spec here pointed at mc-kernel or mc-worldgen. A mirror outside
-    // this list is a mirror nobody compares — which is exactly the state the
-    // `ChunkStore` capability predicates were in for as long as they existed.
-    //
-    // This one carries the whole of `InventoryServiceApi` plus the crafting
-    // vocabulary the api names (`Inventory`, `RecipeTable`, `CraftGrid`,
-    // `RecipeMatch`, `CraftResult` and everything under them), so it is the
-    // widest single mirror in the workspace and the one with the most surface
-    // to drift. It is also the one whose drift is quietest: nothing in
-    // mx-gameplay READS a recipe, so a member that fell out of `ShapedRecipe`
-    // would break no test in either repository.
     repository: 'mx-gameplay',
     file: 'domain/inventory-port.ts',
     source: 'mc-sim',
-    // NOTHING is renamed, deliberately, and that is a claim this gate checks
-    // rather than a note. `mx-gameplay/domain/inventory-port.ts`'s header
-    // records the rule it is following: a mirror that renames a symbol
-    // typechecks, passes every local test, and yields a name that does not
-    // exist on repoint day.
     renamedTypes: [],
-    // EMPTY, AND IT MUST STAY EMPTY. A probe row exempts its symbol from the
-    // "is it on the source's barrel?" check, and the two symbols this mirror
-    // is most likely to grow — `ItemType` and `StackCount` — are precisely the
-    // two that mc-sim's barrel does NOT hand back, because mc-sim deliberately
-    // does not re-export its own kernel mirror. They live in mx-gameplay's
-    // kernel mirrors instead. A probe row here would hide that.
     capabilities: [],
-    // Empty, and unlike the capability array above this one carries no risk of
-    // hiding anything — a property row does not exempt its symbol from the
-    // barrel check. It is empty because an inventory port holds no block table:
-    // there is no column here to compare.
     properties: [],
+    rosters: [],
   },
   {
-    // THE FIRST MIRROR IN THIS LIST WITH NO CALLER, and the row matters more for
-    // that rather than less.
-    //
-    // Every other spec here names a file some stage or rule imports, so a drift
-    // in it eventually breaks a test in its own repository — `check:mirrors` is
-    // the second line of defence. `mx-gameplay/domain/player-port.ts` is
-    // imported by nothing but its own mirror test: it was written because
-    // `docs/testing.md` §3-1's last ⬜ turned out to be waiting on a MIRROR
-    // rather than on 「mc-sim の名簿」, and the half of that row it does not close
-    // is blocked on a noun no repository owns (there is no `Dimension` in
-    // mc-kernel or mc-sim, measured). So nothing calls `moveTo` yet, and this
-    // row plus that test are the whole of what holds the transcription.
-    //
-    // That is exactly the state the `ChunkStore` capability predicates were in —
-    // 「a mirror outside this list is a mirror nobody compares」 — with the
-    // aggravating factor that here there is no stage to break either.
-    repository: 'mx-gameplay',
-    file: 'domain/player-port.ts',
-    source: 'mc-sim',
-    // NOTHING is renamed, and this gate is what checks it rather than a note.
-    // `PlayerPose.feetPosition` is the field most likely to be "tidied" into
-    // `position`, and it must not be: plan.md §3.4 records that every "things
-    // are floating" defect in the reference was a feet-origin/AABB-centre
-    // mismatch, so the field name carries the convention.
+    repository: 'mx-redstone',
+    file: 'domain/frame-contract.ts',
+    source: 'mc-kernel',
     renamedTypes: [],
-    // EMPTY, AND IT MUST STAY EMPTY, for `domain/inventory-port.ts`'s reason
-    // above with different symbols. A probe row exempts its symbol from the "is
-    // it on the source's barrel?" check, and the symbols this mirror is most
-    // likely to grow — `ClockPort` and `CameraPoseSnapshot` — are precisely the
-    // two mc-sim's barrel does NOT hand back, because mc-sim deliberately does
-    // not re-export its own kernel mirror. They live in mx-gameplay's
-    // `domain/frame-contract.ts` instead, which is a spec in this same list and
-    // is repointed at mc-kernel. A probe row here would hide that.
     capabilities: [],
-    // Empty: a player port holds no block table, so there is no column here to
-    // compare.
     properties: [],
-    // -----------------------------------------------------------------------
-    // THIS ROW'S BLIND SPOT, recorded because the row above looks complete.
-    // -----------------------------------------------------------------------
-    //
-    // `domain/type-shape.ts` compares member NAMES and OPTIONALITY, not member
-    // TYPES — `domain/repoint-plan.ts` states it plainly, 「because the mirrors
-    // diverge in their types on purpose」. This mirror has one member where that
-    // is not a tolerable divergence but a compile error waiting for repoint day:
-    //
-    //     cameraPose: Effect.Effect<CameraPoseSnapshot, never, ClockPort>
-    //
-    // The `R` channel is the only place in mx-gameplay where a mirrored
-    // signature names a service, and a mirror that narrowed it to
-    // `Effect<CameraPoseSnapshot>` would pass this gate with the member present
-    // and correctly spelled. mc-compose has already paid for exactly this shape
-    // once — 「The previous local `StageRegistration` dropped the R channel
-    // entirely (`Effect<void>`); R does not erase itself」.
-    //
-    // Same sentence as the `ITEM_TYPES` and `SaveEnvelopeSchema` blind spots
-    // above (kernel's audit §4.9.1(d)) with `capability` replaced by
-    // `requirement`. Until a probe kind can reach it,
-    // `mx-gameplay/test/player-mirror.test.ts` pins it with a two-direction
-    // assignment off the real member type, and `check:repoint` would catch it
-    // from outside; neither is this gate.
+    rosters: [],
+  },
+  {
+    repository: 'mx-ui',
+    file: 'domain/frame-contract.ts',
+    source: 'mc-kernel',
+    renamedTypes: [],
+    capabilities: [],
+    properties: [],
+    rosters: [],
   },
   {
     repository: 'mx-gameplay',
@@ -499,6 +360,7 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     properties: [
       { mirrorExport: 'supportRuleOfBlockId', owner: 'mc-kernel', property: 'supportRule' },
     ],
+    rosters: [],
   },
   {
     // The FOURTH source repository this list has ever pointed at — mc-kernel,
@@ -530,6 +392,7 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     capabilities: [],
     // Empty for the same reason: no property column exists to compare.
     properties: [],
+    rosters: [],
     // -----------------------------------------------------------------------
     // THIS ROW'S BLIND SPOT, recorded because the row above looks complete.
     // -----------------------------------------------------------------------
@@ -570,6 +433,7 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     renamedTypes: [],
     capabilities: [],
     properties: [],
+    rosters: [],
     // THE FIRST ROW IN THIS LIST WHOSE MIRROR IS A CLOSED UNION AND NOTHING
     // ELSE, and the blind spot recorded on mc-sim's `kernel-vocabulary` row
     // applies to it in full rather than in part.
@@ -608,10 +472,10 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
  * report a finding on every probe row. The skip is correct in isolation.
  *
  * Combined with a spec pointed at the wrong source it is a blindfold. Four
- * capability predicates lived in `mx-gameplay/domain/chunk-store-port.ts`, whose
- * source is mc-worldgen and whose header promises that deleting it and
- * repointing every import at `@nerima-games/mc-worldgen` will typecheck.
- * mc-worldgen exports none of the four. Three had probe rows here and were
+ * capability predicates used to live in mx-gameplay's deleted ChunkStore
+ * mirror, whose source was mc-worldgen even though its header promised that
+ * deleting it and repointing every import at `@nerima-games/mc-worldgen` would
+ * typecheck. mc-worldgen exports none of the four. Three had probe rows here and were
  * therefore exempt from the check that would have said so; they reported
  * agreement for as long as they existed. The fourth, `canSupportAttachments`,
  * had no row, fell through to the plain comparison, and failed with exactly the
@@ -737,8 +601,8 @@ export type KnownFinding = {
 }
 
 /**
- * Two entries, both mc-worldgen's, both found by the FIRST run of the property
- * probes — which is the same way this register got its first entry ever.
+ * Historical findings from the first run of the property probes — which is the
+ * same way this register got its first entry ever.
  *
  * That first one was mx-gameplay's `isReplaceable` omitting lava (block id 11),
  * which mc-kernel's registry marks `replaceable: true`. Falling sand and gravel
@@ -748,22 +612,10 @@ export type KnownFinding = {
  * is what the register requires: a known finding fails the run once it is fixed,
  * so this list cannot quietly become a set of switched-off checks.
  *
- * The two below are the property half's version of the same morning's work. Both
- * are stale transcriptions of a kernel column that grew, both are in the DARK
- * direction, and neither is fixable from here — the file that carries them is
- * mc-worldgen's, with its own pull request, its own review and its own
- * `pnpm verify`. Recording them is what lets the probe that FINDS them land
- * today instead of landing after the fix, which is the trade the header above
- * argues for at length.
- *
- * A NOTE ON HOW THESE TWO WILL EXPIRE, because it is sharper than it was for the
- * lava entry. A property fingerprint carries every disagreeing id, so ANY change
- * to either side re-fails the run: mc-worldgen adding one of the missing rows,
- * and equally mc-kernel adding one more non-opaque block. The second case will
- * look like an unrelated failure and is not one — it is this register doing
- * exactly what it promises, refusing to keep suppressing a finding that has
- * changed shape. Re-run with `MIRROR_FINGERPRINTS=1` and replace the entry, or
- * better, delete it because mc-worldgen fixed the table.
+ * The property findings described below were fixed when mc-worldgen removed its
+ * local kernel table and imported the package directly. They remain documented
+ * in the empty register's comments so the reason for the gate is not lost, but
+ * they must not remain as suppressions once the source mirror no longer exists.
  */
 export const KNOWN_FINDINGS: ReadonlyArray<KnownFinding> = [
   // EMPTY, and both entries that were here are gone because they were FIXED.
@@ -885,7 +737,7 @@ export const observationKind = (observation: ValueObservation): string => {
     // Structurally unreachable: every ValueObservation tag is handled above,
     // so TypeScript only accepts this call because `observation` has
     // narrowed to `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       return assertUnreachable(observation)
   }
@@ -958,6 +810,8 @@ export type MirrorObservation = {
   readonly types: ReadonlyArray<TypeShape>
   readonly capabilities: ReadonlyArray<CapabilityObservation>
   readonly properties: ReadonlyArray<PropertyObservation>
+  /** Closed ordered lists exported by the mirror and compared with their source. */
+  readonly rosters: ReadonlyArray<RosterObservation>
   /**
    * Every property column the mirror appears to transcribe.
    *
@@ -972,6 +826,8 @@ export type MirrorObservation = {
 export type SourceObservation = {
   readonly values: ReadonlyArray<ValueObservation>
   readonly types: ReadonlyArray<TypeShape>
+  /** Closed ordered lists exported by the source. */
+  readonly rosters: ReadonlyArray<RosterObservation>
   /** Every name in the source's `api-lock.md`, whatever its kind. */
   readonly published: ReadonlySet<string>
 }
@@ -1027,6 +883,7 @@ export type MirrorFinding =
       readonly owner: string
       readonly property: string
     }
+  | RosterFinding
   /**
    * The mirror transcribes a property column that `MIRROR_SPECS` does not probe.
    *
@@ -1041,7 +898,7 @@ export type MirrorFinding =
    * add the two property rows by hand. Nothing made them do it and nothing would
    * have complained had they added only one — the check would have swept 256 ids
    * of `opacity`, reported agreement on `lightEmission` by never reading it, and
-   * printed a clean 13/13.
+   * printed a clean fixed-count summary.
    */
   | {
       readonly _tag: 'PropertyColumnUnprobed'
@@ -1062,7 +919,10 @@ const compareValues = (
   source: SourceObservation,
 ): ReadonlyArray<MirrorFinding> => {
   const bySourceName = new Map(source.values.map((value) => [value.name, value]))
-  const probed = new Set(spec.capabilities.map((probe) => probe.mirrorExport))
+  const probed = new Set([
+    ...spec.capabilities.map((probe) => probe.mirrorExport),
+    ...spec.rosters.map((probe) => probe.mirrorExport),
+  ])
   const findings: Array<MirrorFinding> = []
 
   for (const observed of mirror) {
@@ -1233,7 +1093,7 @@ const compareTypes = (
         // real entries — this arm only needs a `Type.member` row to be added
         // to actually fire, which is a data change, not a code path this
         // suite can drive without inventing a divergence nobody declared.
-        /* v8 ignore next 3 */
+        /* v8 ignore next 3 -- @preserve */
         if (divergenceFor(spec, `${shape.name}.${member.name}`) !== undefined) {
           continue
         }
@@ -1243,7 +1103,7 @@ const compareTypes = (
       }
 
       for (const member of arm.members) {
-        /* v8 ignore next 3 -- same as above: no committed Type.member divergence exists to drive this arm */
+        /* v8 ignore next 3 -- @preserve; same as above: no committed Type.member divergence exists to drive this arm */
         if (divergenceFor(spec, `${shape.name}.${member.name}`) !== undefined) {
           continue
         }
@@ -1279,7 +1139,7 @@ const compareCapabilities = (
     // exercised (see the value-level divergence test in
     // test/mirror-contract.test.ts) — this arm only needs a capability row
     // added to DECLARED_DIVERGENCES to fire, which is a data change.
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (divergenceFor(spec, capability.mirrorExport) !== undefined) {
       continue
     }
@@ -1311,7 +1171,8 @@ const compareCapabilities = (
  * caught from inside the probe loop at all: a column with no row in
  * `MIRROR_SPECS` contributes no `PropertyObservation`, so it is absent from
  * every list the comparison walks and there is nothing to notice its absence.
- * The count 13/13 counts specs, not columns, so it stays 13/13.
+ * The status count counts specs, not columns. A clean spec count therefore says
+ * nothing about a column unless this reverse-direction check has observed it.
  *
  * `DECLARED_DIVERGENCES` still exempts a column, exactly as it does for a
  * declared probe: a mirror that deliberately answers differently from its source
@@ -1356,7 +1217,7 @@ const compareProperties = (
     // exercised (see the value-level divergence test in
     // test/mirror-contract.test.ts) — this arm only needs a property row
     // added to DECLARED_DIVERGENCES to fire, which is a data change.
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (divergenceFor(spec, property.mirrorExport) !== undefined) {
       continue
     }
@@ -1401,12 +1262,12 @@ export const compareSurfaces = (
   mirror: MirrorObservation,
   source: SourceObservation,
 ): ReadonlyArray<MirrorFinding> => {
-  if (mirror.values.length === 0 && mirror.types.length === 0) {
+  if (mirror.values.length === 0 && mirror.types.length === 0 && mirror.rosters.length === 0) {
     return [
       {
         _tag: 'NothingObserved',
         detail:
-          `${mirrorPath(spec)} was loaded but yielded no exported values and no object types. ` +
+          `${mirrorPath(spec)} was loaded but yielded no exported values, object types, or rosters. ` +
           'Either the file is empty, or the extractor is broken. Both are failures: with nothing ' +
           'to compare, every comparison below would pass.',
       },
@@ -1430,6 +1291,7 @@ export const compareSurfaces = (
     ...compareTypes(spec, mirror.types, source),
     ...compareCapabilities(spec, mirror.capabilities),
     ...compareProperties(spec, mirror.properties),
+    ...compareRosters(spec.rosters, mirror.rosters, source.rosters),
     // Runs on the OBSERVED columns rather than the declared probes, so it is the
     // one check here that can fail a spec whose every declared probe passed.
     ...unprobedColumns(spec, mirror.probeableColumns),
@@ -1579,6 +1441,29 @@ export const describeMirrorFinding = (spec: MirrorSpec, finding: MirrorFinding):
         'A column compared against nothing agrees with everything, which is the one result this ' +
         'checker must never produce.'
       )
+    case 'RosterDiffers': {
+      const lines = [
+        `${at}: ${finding.symbol} does not agree with ${finding.owner}'s ` +
+          `"${finding.source}" roster.`,
+      ]
+      if (finding.onlyInSource.length > 0) {
+        lines.push(`      ${finding.owner} has members the mirror lacks: ${list(finding.onlyInSource)}`)
+      }
+      if (finding.onlyInMirror.length > 0) {
+        lines.push(`      the mirror has members ${finding.owner} does not publish: ${list(finding.onlyInMirror)}`)
+      }
+      if (finding.orderDiffers) {
+        lines.push('      Membership agrees, but the published order differs between the two exports.')
+      }
+      lines.push('      Roster membership and order are part of the mirrored contract.')
+      return lines.join('\n')
+    }
+    case 'RosterProbeEmpty':
+      return (
+        `${at}: the roster probe on ${finding.symbol} read no members from the mirror or ` +
+        `${finding.owner}'s "${finding.source}" export, so it compared nothing and would have ` +
+        'reported agreement. Either the export is empty or the probe is broken.'
+      )
     case 'PropertyColumnUnprobed':
       return (
         `${at}: it exports ${finding.symbol}, which transcribes ${finding.owner}'s ` +
@@ -1594,7 +1479,7 @@ export const describeMirrorFinding = (spec: MirrorSpec, finding: MirrorFinding):
     // Structurally unreachable: every MirrorFinding tag is handled above, so
     // TypeScript only accepts this call because `finding` has narrowed to
     // `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       return assertUnreachable(finding)
   }
@@ -1619,6 +1504,7 @@ export type MirrorOutcome =
       readonly typesCompared: number
       readonly capabilitiesCompared: number
       readonly propertiesCompared: number
+      readonly rostersCompared: number
       /**
        * Ids read across every property probe on this mirror.
        *
@@ -1659,6 +1545,7 @@ export const compareMirror = (
     typesCompared: mirror.types.length,
     capabilitiesCompared: mirror.capabilities.length,
     propertiesCompared: mirror.properties.length,
+    rostersCompared: mirror.rosters.length,
     propertyIdsCompared: mirror.properties.reduce(
       (total, property) => total + property.readings.length,
       0,
@@ -1848,7 +1735,7 @@ export const describeMirrorRun = (
     }
     const idsSuffix =
       outcome.propertiesCompared > 0 ? ` over ${String(outcome.propertyIdsCompared)} id reading(s)` : ''
-    const counts = `${String(outcome.valuesCompared)} value(s), ${String(outcome.typesCompared)} type(s), ${String(outcome.capabilitiesCompared)} capability probe(s), ${String(outcome.propertiesCompared)} property probe(s)${idsSuffix}`
+    const counts = `${String(outcome.valuesCompared)} value(s), ${String(outcome.typesCompared)} type(s), ${String(outcome.capabilitiesCompared)} capability probe(s), ${String(outcome.propertiesCompared)} property probe(s), ${String(outcome.rostersCompared)} roster probe(s)${idsSuffix}`
     const status =
       outcome.findings.length > 0 ? 'FAIL' : outcome.known.length > 0 ? 'KNOWN' : 'ok   '
     const knownSuffix =
@@ -1902,7 +1789,7 @@ export const describeMirrorRun = (
     // `failingOutcomes(outcomes)` above, which already filters to
     // `_tag === 'Compared'`. TypeScript does not narrow `failing`'s element
     // type from that filter living in a separate function, hence the check.
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (outcome._tag !== 'Compared') {
       continue
     }
@@ -1915,7 +1802,7 @@ export const describeMirrorRun = (
 
   lines.push(
     'A mirror and its source have drifted apart. Neither repository can see this on its own:',
-    'the source is not a dependency of the mirror and cannot be until it is published, so both',
+    'the source is not a dependency of the mirror, so both',
     "sides' tests pin their own copy and agree with themselves. Fix the mirror in its own",
     'repository — or, if the divergence is intended, record it in DECLARED_DIVERGENCES in',
     'domain/mirror-contract.ts with the reason, so that it becomes a reviewed line in a diff.',

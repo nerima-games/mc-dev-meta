@@ -3,8 +3,6 @@
  * of a committed `api-lock.md`. PURE — no filesystem, no compiler, no
  * dependencies.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * Why `api-lock.md` is the source of truth for the type half
  * ---------------------------------------------------------------------------
@@ -294,7 +292,7 @@ const membersOf = (body: string): ReadonlyArray<TypeMember> => {
     // Structurally unreachable: MEMBER_ANCHOR's name group is a mandatory
     // (non-optional) pattern, so a successful match has always captured it.
     // TypeScript's regex typing does not encode "this group is unconditional".
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (name === undefined) {
       continue
     }
@@ -457,7 +455,7 @@ const readVariantBodies = (
     // and empty-string cases above have all been ruled out, so the character
     // `skipOperand` starts on can never be one of ITS OWN depth-0 stop
     // characters — it always advances by at least one position.
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (next <= cursor) {
       return { bodies, unterminated: false }
     }
@@ -495,13 +493,13 @@ export const declaredTypes = (text: string): ShapeResult<ReadonlyMap<string, Typ
     // both mandatory (non-optional) patterns, so a successful match has
     // always captured both. TypeScript's regex typing does not encode "this
     // group is unconditional".
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (keyword === undefined || name === undefined) {
       continue
     }
     // Only top-level declarations. A `type` inside a namespace or a function
     // body is not part of any surface this tool compares.
-    if ((depths[match.index] ?? 0) !== 0) {
+    if (depths[match.index] !== 0) {
       continue
     }
 
@@ -581,6 +579,10 @@ export const parseApiLock = (markdown: string): ReadonlyArray<ApiLockEntry> => {
   for (const line of lines) {
     if (fence !== undefined) {
       if (line.trimEnd() === '```') {
+        // `fence` opens only after a heading, and closing it clears `pending`
+        // before another fence can be opened. This guard documents that
+        // parser-state invariant while keeping malformed state defensive.
+        /* v8 ignore next -- @preserve */
         if (pending !== undefined) {
           entries.push({ name: pending.name, kind: pending.kind, text: fence.join('\n') })
         }
@@ -599,7 +601,7 @@ export const parseApiLock = (markdown: string): ReadonlyArray<ApiLockEntry> => {
       // The `: undefined` fallback is structurally unreachable: both of
       // ENTRY_HEADING's groups are mandatory (non-optional) patterns, so a
       // successful match has always captured both.
-      /* v8 ignore next */
+      /* v8 ignore next -- @preserve */
       pending = name !== undefined && kind !== undefined ? { name, kind } : undefined
       continue
     }

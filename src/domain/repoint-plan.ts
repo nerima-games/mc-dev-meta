@@ -2,8 +2,6 @@
  * Cross-repository repoint verification: the decision half. PURE — no
  * filesystem, no child process, no dependencies.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * What this adds to `pnpm check:mirrors`, and why that gate is not enough
  * ---------------------------------------------------------------------------
@@ -128,8 +126,8 @@ export type RepointSpec = {
  * than an oversight: it is the mirror whose deletion the freeze checklist is
  * actually waiting on, it is carried by three repositories rather than one —
  * which is what turned a finding into a systemic one — and its source is the
- * repository being frozen. The `kernel-vocabulary.ts` mirrors are still the
- * obvious next five rows; they are left out so that the gate's own failure
+ * repository being frozen. The remaining `kernel-vocabulary.ts` mirrors are
+ * still the obvious next four rows; they are left out so that the gate's own failure
  * modes are understood on a small set first.
  *
  * `inventory-port.ts` is the SECOND source repository this gate has ever
@@ -420,7 +418,7 @@ export const parseDiagnostics = (output: string): ReadonlyArray<Diagnostic> =>
       // all five. TypeScript's `RegExpExecArray` typing does not encode that
       // a group is unconditional, hence the check — but no input can drive
       // this arm without DIAGNOSTIC_LINE itself gaining an optional group.
-      /* v8 ignore next 9 */
+      /* v8 ignore next 9 -- @preserve */
       if (
         file === undefined ||
         line === undefined ||
@@ -504,7 +502,7 @@ export type KnownRepointFinding = {
  * that each needs its own pull request, against a repository that must also
  * keep compiling standalone in its own CI.
  *
- * FOUR ENTRIES, THREE REPOSITORIES. mx-gameplay carries two because
+ * TWO ENTRIES, ONE REPOSITORY. mx-gameplay carries both because
  * `tsconfig.preview.json` deliberately does not include `test/**`, so its
  * preview app holds a second copy of the declaration rather than importing the
  * test one. One owner, two pull-request-sized edits, and the register counts
@@ -521,7 +519,7 @@ export type KnownRepointFinding = {
  * which is the point of measuring it now.
  */
 export const KNOWN_REPOINT_FINDINGS: ReadonlyArray<KnownRepointFinding> = [
-  // FOUR ENTRIES, and this array was empty for exactly one commit.
+  // TWO ENTRIES, and this array was empty for exactly one commit.
   //
   // The first run of this gate recorded seventeen findings across mx-gameplay,
   // mx-ui and mx-redstone, every one of them the same shape: a test context that
@@ -535,12 +533,12 @@ export const KNOWN_REPOINT_FINDINGS: ReadonlyArray<KnownRepointFinding> = [
   // THE SEVENTEEN WERE NOT SEVENTEEN DEFECTS. They were seventeen CALL SITES of
   // one, and what landed at the source was not seventeen fixes but a funnel:
   // every site now resolves through a single `Layer.Layer<FrameServices>`
-  // declaration, one per tsconfig project. The four below are what is left when
+  // declaration, one per tsconfig project. The two below are what is left when
   // that funnelling is done -- the irreducible floor of a divergence, not a
   // backlog that someone forgot to work. Each is ONE LINE on publish day, and
-  // each of the four files already carries its own replacement in its header.
+  // each of the two files already carries its own replacement in its header.
   //
-  // WHY THE FOUR ARE IRREDUCIBLE, on the merits and not merely on principle.
+  // WHY THE TWO ARE IRREDUCIBLE, on the merits and not merely on principle.
   // `ClockPort` is a `Context.Tag`, and Effect keys the requirement channel on
   // the tag's TYPE rather than on its identifier string, so only a value typed
   // from `@nerima-games/mc-kernel` can discharge a `ClockPort` requirement.
@@ -583,22 +581,6 @@ export const KNOWN_REPOINT_FINDINGS: ReadonlyArray<KnownRepointFinding> = [
       'mx-gameplay preview app: the second copy of FrameServicesLayer, because tsconfig.preview.json excludes test/**',
     owner: 'mx-gameplay',
     fix: 'The same one-line substitution as the test harness, in apps/preview-mining-site/frame-services.ts. It is a separate edit and not a duplicate: the preview is a separate tsconfig project and deliberately cannot import the test copy.',
-  },
-  {
-    fingerprint:
-      "mx-ui/domain/frame-contract.ts|tsconfig.test.json|test/frame-services.ts|TS2322|Type 'Layer<never, never, never>' is not assignable to type 'Layer<ClockPort, never, never>'.",
-    summary:
-      'mx-ui test harness: FrameServicesLayer is Layer.empty, and kernel’s FrameServices is ClockPort',
-    owner: 'mx-ui',
-    fix: 'Replace `Layer.empty` in test/frame-services.ts with `FixedClockLayer({ monotonicSecs: MonotonicTimeSecs(0), wallClockEpochMillis: EpochMillis(0) })` from @nerima-games/mc-kernel.',
-  },
-  {
-    fingerprint:
-      "mx-redstone/domain/frame-contract.ts|tsconfig.test.json|test/frame-services.ts|TS2322|Type 'Layer<never, never, never>' is not assignable to type 'Layer<ClockPort, never, never>'.",
-    summary:
-      'mx-redstone test harness: FrameServicesLayer is Layer.empty, and kernel’s FrameServices is ClockPort',
-    owner: 'mx-redstone',
-    fix: 'Replace `Layer.empty` in test/frame-services.ts with `FixedClockLayer({ monotonicSecs: MonotonicTimeSecs(0), wallClockEpochMillis: EpochMillis(0) })` from @nerima-games/mc-kernel.',
   },
 ]
 

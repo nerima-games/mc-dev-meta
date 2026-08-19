@@ -49,11 +49,12 @@ import type { TypeShape } from '../src/domain/type-shape'
 
 const spec: MirrorSpec = {
   repository: 'mx-gameplay',
-  file: 'domain/chunk-store-port.ts',
+  file: 'domain/synthetic-mirror.ts',
   source: 'mc-worldgen',
   renamedTypes: [{ mirror: 'WorldgenChunk', source: 'Chunk' }],
   capabilities: [{ mirrorExport: 'isReplaceable', owner: 'mc-kernel', capability: 'replaceable' }],
   properties: [{ mirrorExport: 'opacityOfBlockId', owner: 'mc-kernel', property: 'opacity' }],
+  rosters: [],
 }
 
 /** A refinement that accepts every finite, non-negative number. */
@@ -169,6 +170,7 @@ const agreeingMirror: MirrorObservation = {
   ],
   capabilities: [capability(AGREED_IDS, AGREED_IDS)],
   properties: [property(AGREED_OPACITIES)],
+  rosters: [],
   // The one column this fixture transcribes, and `spec` probes it. The pair
   // agreeing is what makes this the AGREEING mirror for the coverage check too.
   probeableColumns: [{ mirrorExport: 'opacityOfBlockId', property: 'opacity', owner: 'mc-kernel' }],
@@ -198,6 +200,7 @@ const agreeingSource: SourceObservation = {
       ['OutOfWorld', ['_tag']],
     ]),
   ],
+  rosters: [],
   published: new Set(['AIR_BLOCK_ID', 'ChunkStore', 'ChunkAxis', 'ChunkStoreApi', 'Chunk', 'BlockReading']),
 }
 
@@ -289,11 +292,13 @@ describe('a closed literal union’s WIDTH is invisible here, by construction', 
       types: [alias('ItemType')],
       capabilities: [],
       properties: [],
+      rosters: [],
       probeableColumns: [],
     }
     const wide: SourceObservation = {
       values: [],
       types: [alias('ItemType')],
+      rosters: [],
       published: new Set(['ItemType']),
     }
 
@@ -335,7 +340,7 @@ describe('a changed constant fails, and names both values', () => {
   it('names the symbol, what the mirror says, and what the source says', () => {
     const message = rendered(drifted)
 
-    expect(message).toContain('mx-gameplay/domain/chunk-store-port.ts')
+    expect(message).toContain('mx-gameplay/domain/synthetic-mirror.ts')
     expect(message).toContain('AIR_BLOCK_ID')
     expect(message).toContain('is 1')
     expect(message).toContain('mc-worldgen publishes 0')
@@ -474,6 +479,20 @@ describe('a value whose KIND differs fails even when nothing else does', () => {
     expect(compareSurfaces(spec, mirror, source)).toStrictEqual([
       { _tag: 'KindDiffers', symbol: 'DEFAULT_LAYER', mirror: 'a Layer factory', source: 'a plain function' },
     ])
+  })
+
+  it('accepts two Opaque exports of the same kind', () => {
+    const mirror: MirrorObservation = {
+      ...agreeingMirror,
+      values: [...agreeingMirror.values, { _tag: 'Opaque', name: 'DEFAULT_LAYER', kind: 'plain function' }],
+    }
+    const source: SourceObservation = {
+      ...agreeingSource,
+      values: [...agreeingSource.values, { _tag: 'Opaque', name: 'DEFAULT_LAYER', kind: 'plain function' }],
+      published: new Set([...agreeingSource.published, 'DEFAULT_LAYER']),
+    }
+
+    expect(compareSurfaces(spec, mirror, source)).toStrictEqual([])
   })
 })
 
@@ -693,13 +712,8 @@ describe('the property probes the registry actually carries', () => {
   const specFor = (repository: string, file: string): MirrorSpec | undefined =>
     MIRROR_SPECS.find((entry) => entry.repository === repository && entry.file === file)
 
-  it('probes both of the columns mc-worldgen mirrors', () => {
-    const worldgen = specFor('mc-worldgen', 'domain/kernel-vocabulary.ts')
-
-    expect(worldgen?.properties).toStrictEqual([
-      { mirrorExport: 'opacityOfBlockId', owner: 'mc-kernel', property: 'opacity' },
-      { mirrorExport: 'lightEmissionOfBlockId', owner: 'mc-kernel', property: 'lightEmission' },
-    ])
+  it('does not register a kernel mirror after mc-worldgen moved to the package', () => {
+    expect(specFor('mc-worldgen', 'domain/kernel-vocabulary.ts')).toBeUndefined()
   })
 
   // The mirror that looks like the flag mirror and is not only that:
@@ -718,8 +732,8 @@ describe('the property probes the registry actually carries', () => {
    *
    * A CAPABILITY row exempts its symbol from the "is it on the source's barrel?"
    * comparison — it has to, because a probed predicate belongs to a third
-   * repository. That skip is what hid four broken repoint promises in
-   * `chunk-store-port.ts` for as long as they existed.
+   * repository. That skip is what hid four broken repoint promises in the
+   * removed ChunkStore mirror for as long as it existed.
    *
    * A PROPERTY row must NOT inherit that exemption. Kernel publishes
    * `opacityOfBlockId`, `lightEmissionOfBlockId` and `supportRuleOfBlockId` on
@@ -771,12 +785,14 @@ describe('the property probes the registry actually carries', () => {
       renamedTypes: [],
       capabilities: [],
       properties: [],
+      rosters: [],
     }
     const mirror: MirrorObservation = {
       values: [{ _tag: 'Opaque', name: 'BLOCK_DROP_REGISTRY', kind: 'table' }],
       types: [],
       capabilities: [],
       properties: [],
+      rosters: [],
       probeableColumns: [],
     }
     // `published` needs at least one entry, or `compareSurfaces` reads the
@@ -784,7 +800,7 @@ describe('the property probes the registry actually carries', () => {
     // the value loop — a different, already-tested guard (see "an empty
     // observation is a failure" below). `SOMETHING_ELSE` keeps that guard out
     // of the way without being the thing under test.
-    const source: SourceObservation = { values: [], types: [], published: new Set(['SOMETHING_ELSE']) }
+    const source: SourceObservation = { values: [], types: [], rosters: [], published: new Set(['SOMETHING_ELSE']) }
 
     // BLOCK_DROP_REGISTRY itself is not published on the source and has no
     // counterpart — without the divergence exemption this would be
@@ -799,6 +815,36 @@ describe('the property probes the registry actually carries', () => {
     }
 
     expect(compareSurfaces(spec, mirror, agreeingSource)).toStrictEqual([])
+  })
+
+  it('includes roster probes when determining value symbols to skip', () => {
+    const rosteredSpec: MirrorSpec = {
+      ...spec,
+      rosters: [{ mirrorExport: 'ChunkStore', owner: 'mc-kernel', sourceExport: 'ChunkStore' }],
+    }
+    const mirror: MirrorObservation = {
+      ...agreeingMirror,
+      rosters: [{ name: 'ChunkStore', members: ['@nerima-games/mc-worldgen/ChunkStore'] }],
+    }
+    const source: SourceObservation = {
+      ...agreeingSource,
+      rosters: [{ name: 'ChunkStore', members: ['@nerima-games/mc-worldgen/ChunkStore'] }],
+    }
+
+    expect(compareSurfaces(rosteredSpec, mirror, source)).toStrictEqual([])
+  })
+
+  it('does not report a mirrored value that the source publishes without a value observation', () => {
+    const mirror: MirrorObservation = {
+      ...agreeingMirror,
+      values: [...agreeingMirror.values, { _tag: 'Opaque', name: 'DEFAULT_LAYER', kind: 'plain function' }],
+    }
+    const source: SourceObservation = {
+      ...agreeingSource,
+      published: new Set([...agreeingSource.published, 'DEFAULT_LAYER']),
+    }
+
+    expect(compareSurfaces(spec, mirror, source)).toStrictEqual([])
   })
 
   it('gives every spec a property array, so a missing one cannot read as empty', () => {
@@ -909,12 +955,14 @@ describe('type shape', () => {
       renamedTypes: [],
       capabilities: [],
       properties: [],
+      rosters: [],
     }
     const mirror: MirrorObservation = {
       values: [],
       types: [shape('BlockDropRegistryEntry', [['id', false]])],
       capabilities: [],
       properties: [],
+      rosters: [],
       probeableColumns: [],
     }
     // A shape with the SAME name but a totally different member set — if the
@@ -922,6 +970,7 @@ describe('type shape', () => {
     const source: SourceObservation = {
       values: [],
       types: [shape('BlockDropRegistryEntry', [['definition', false], ['id', false], ['type', false]])],
+      rosters: [],
       published: new Set(['BlockDropRegistryEntry']),
     }
 
@@ -968,6 +1017,19 @@ describe('type shape', () => {
 
     expect(rendered(drifted)).toContain('not on mc-worldgen\'s published surface')
   })
+
+  it('does not report a mirror type missing from parsed shapes when the source publishes its name', () => {
+    const mirror: MirrorObservation = {
+      ...agreeingMirror,
+      types: [...agreeingMirror.types, shape('InventedPort', [['a', false]])],
+    }
+    const source: SourceObservation = {
+      ...agreeingSource,
+      published: new Set([...agreeingSource.published, 'InventedPort']),
+    }
+
+    expect(compareSurfaces(spec, mirror, source)).toStrictEqual([])
+  })
 })
 
 describe('an empty observation is a failure, not agreement', () => {
@@ -977,7 +1039,7 @@ describe('an empty observation is a failure, not agreement', () => {
   it('fails when the mirror was loaded but yielded nothing', () => {
     const findings = compareSurfaces(
       spec,
-      { values: [], types: [], capabilities: [], properties: [], probeableColumns: [] },
+      { values: [], types: [], capabilities: [], properties: [], rosters: [], probeableColumns: [] },
       agreeingSource,
     )
 
@@ -991,6 +1053,7 @@ describe('an empty observation is a failure, not agreement', () => {
     const findings = compareSurfaces(spec, agreeingMirror, {
       values: [],
       types: [],
+      rosters: [],
       published: new Set<string>(),
     })
 
@@ -1119,14 +1182,15 @@ describe('a known outstanding defect is reported without failing the run', () =>
  * can only ask it about a column `MIRROR_SPECS` names. That list is
  * hand-maintained. So the failure it cannot see is a column nobody added a row
  * for: it produces no `PropertyObservation`, appears in no comparison, and the
- * run prints the same 13/13 it prints when everything is compared. kernel's
+ * run can print the same clean spec count it prints when everything is compared. kernel's
  * audit §4.9.1(d) is exactly this — 「ミラーが転記している能力の数より probe が
  * 少なければ、そのチェックは検査していない成功を報告する」.
  *
- * It is not hypothetical here either. mc-worldgen's stale `lightEmission` table
- * was found ONLY because someone hand-added the second property row next to the
- * `opacity` one. Had they added one and not the other, fourteen missing emitters
- * would have gone on reading as dark behind a green gate.
+ * It is not hypothetical here either. A stale local table in mc-worldgen was
+ * found ONLY because someone hand-added the second property row next to the
+ * `opacity` one. Had they added one and not the other, missing emitters would
+ * have gone on reading as dark behind a green gate. The table is now deleted,
+ * so this remains a regression fixture for the checker rather than a live row.
  *
  * `unprobedColumns` closes it by asking the MIRROR what it transcribes rather
  * than asking the spec what to compare.
@@ -1137,7 +1201,7 @@ describe('a transcribed column with no probe fails, and names the column', () =>
     probeableColumns: [
       { mirrorExport: 'opacityOfBlockId', property: 'opacity', owner: 'mc-kernel' },
       // Transcribed by the mirror, absent from `spec.properties`. This is the
-      // mc-worldgen defect's shape exactly.
+      // The former mc-worldgen defect's shape exactly.
       { mirrorExport: 'lightEmissionOfBlockId', property: 'lightEmission', owner: 'mc-kernel' },
     ],
   }
@@ -1230,10 +1294,9 @@ describe('the committed KNOWN_FINDINGS register', () => {
   })
 
   /*
-   * The register's two current entries are mc-worldgen's stale opacity and
-   * lightEmission tables, found by the first run of the property probes. They are
-   * recorded rather than fixed because the file that carries them belongs to
-   * another repository — the trade the header argues for at length.
+   * The register used to contain mc-worldgen's stale opacity and lightEmission
+   * tables, found by the first run of the property probes. Directly importing
+   * mc-kernel removed that local table, so the findings must stay absent.
    *
    * Asserted as a SHAPE rather than by exact fingerprint, because the fingerprint
    * carries every disagreeing id and is meant to be regenerated by running the
@@ -1258,10 +1321,6 @@ describe('the committed KNOWN_FINDINGS register', () => {
     // detected it. Over an empty array it asserts nothing, and that is honest
     // rather than hidden — the length assertion above is what has teeth today.
     expect(propertyFindings).toHaveLength(0)
-    for (const entry of propertyFindings) {
-      expect(entry.fingerprint.startsWith('mc-worldgen/domain/kernel-vocabulary.ts|')).toBe(true)
-      expect(entry.owner).toBe('mc-worldgen')
-    }
   })
 
   /*
@@ -1337,6 +1396,66 @@ describe('describeMirrorFinding covers the other half of every two-sided message
     })
     expect(message).toContain('setBlock is required here and optional in mc-worldgen.')
   })
+
+  it('describes roster membership and order drift', () => {
+    const message = describeMirrorFinding(spec, {
+      _tag: 'RosterDiffers',
+      symbol: 'ITEM_TYPES',
+      owner: 'mc-kernel',
+      source: 'ITEM_TYPES',
+      onlyInMirror: ['potion'],
+      onlyInSource: ['arrow'],
+      orderDiffers: true,
+    })
+    expect(message).toContain('mc-kernel has members the mirror lacks: arrow')
+    expect(message).toContain('the mirror has members mc-kernel does not publish: potion')
+    expect(message).toContain('Membership agrees, but the published order differs')
+  })
+
+  it('describes each roster drift direction independently', () => {
+    const sourceOnly = describeMirrorFinding(spec, {
+      _tag: 'RosterDiffers',
+      symbol: 'ITEM_TYPES',
+      owner: 'mc-kernel',
+      source: 'ITEM_TYPES',
+      onlyInMirror: [],
+      onlyInSource: ['arrow'],
+      orderDiffers: false,
+    })
+    const mirrorOnly = describeMirrorFinding(spec, {
+      _tag: 'RosterDiffers',
+      symbol: 'ITEM_TYPES',
+      owner: 'mc-kernel',
+      source: 'ITEM_TYPES',
+      onlyInMirror: ['potion'],
+      onlyInSource: [],
+      orderDiffers: false,
+    })
+    const orderOnly = describeMirrorFinding(spec, {
+      _tag: 'RosterDiffers',
+      symbol: 'ITEM_TYPES',
+      owner: 'mc-kernel',
+      source: 'ITEM_TYPES',
+      onlyInMirror: [],
+      onlyInSource: [],
+      orderDiffers: true,
+    })
+
+    expect(sourceOnly).toContain('mc-kernel has members the mirror lacks: arrow')
+    expect(mirrorOnly).toContain('the mirror has members mc-kernel does not publish: potion')
+    expect(orderOnly).toContain('Membership agrees, but the published order differs')
+  })
+
+  it('describes a roster probe that observed no members', () => {
+    const message = describeMirrorFinding(spec, {
+      _tag: 'RosterProbeEmpty',
+      symbol: 'ITEM_TYPES',
+      owner: 'mc-kernel',
+      source: 'ITEM_TYPES',
+    })
+    expect(message).toContain('read no members')
+    expect(message).toContain('compared nothing')
+  })
 })
 
 describe('the report as a whole', () => {
@@ -1350,7 +1469,7 @@ describe('the report as a whole', () => {
   it('exits 1 and marks the failing mirror', () => {
     expect(mirrorRunExitCode([failing])).toBe(1)
     expect(describeMirrorRun([failing]).join('\n')).toContain(
-      'FAIL mx-gameplay/domain/chunk-store-port.ts vs mc-worldgen',
+      'FAIL mx-gameplay/domain/synthetic-mirror.ts vs mc-worldgen',
     )
   })
 
@@ -1358,7 +1477,7 @@ describe('the report as a whole', () => {
   // "fifteen mirrors agreed" from "fifteen mirrors were read as empty".
   it('reports how much was compared, not just the verdict', () => {
     expect(describeMirrorRun([failing]).join('\n')).toContain(
-      '3 value(s), 3 type(s), 1 capability probe(s), 1 property probe(s)',
+      '3 value(s), 3 type(s), 1 capability probe(s), 1 property probe(s), 0 roster probe(s)',
     )
   })
 
@@ -1370,7 +1489,7 @@ describe('the report as a whole', () => {
    */
   it('reports how many ids the property probes actually read', () => {
     expect(describeMirrorRun([failing]).join('\n')).toContain(
-      '1 property probe(s) over 3 id reading(s)',
+      '1 property probe(s), 0 roster probe(s) over 3 id reading(s)',
     )
   })
 

@@ -198,6 +198,16 @@ describe('reading a plain object type', () => {
     expect(memberNames(shapeOf(text, 'GameModule'))).toStrictEqual(['frameStages', 'layers'])
   })
 
+  it('skips nested generic parameter lists before reading the declaration body', () => {
+    const text = [
+      'export interface Registry<T extends Map<string, Array<number>>> {',
+      '  readonly value: T',
+      '}',
+    ].join('\n')
+
+    expect(memberNames(shapeOf(text, 'Registry'))).toStrictEqual(['value'])
+  })
+
   // REGRESSION: a generic parameter's default can itself be a function type,
   // whose `=>` must not be read as closing the parameter list on its `>`.
   it('is not confused by an arrow function type inside a generic default', () => {
