@@ -13,7 +13,7 @@
 ## 0. 一行で
 
 **15 リポジトリを `repos/` に clone し、1 つの pnpm workspace として束ねる。
-そして合成状態を `repos.json` に記録する。**(plan.md §6 Step 0 item 2)
+合成状態を `repos.json` に、横断機能の状態を機能棚卸しに記録する。**(plan.md §6 Step 0 item 2)
 
 ## 1. 索引
 
@@ -21,8 +21,11 @@
 | --- | --- | --- |
 | [workflow.md](./workflow.md) | **開発ワークフロー。** セットアップ、日々の流れ、`workspace:*` から公開バージョンへの移行 | **全員。最初に読む** |
 | [manifest.md](./manifest.md) | **なぜ `repos.json` が存在するのか。** `pnpm sync` が壊さないもの | 全員。**必読** |
-| [step2-status.md](./step2-status.md) | **横断の現況。** plan.md §6 Step 2 の完了条件「内蔵プレビューが操作可能」を満たすリポジトリは **0 / 15**。その単一のボトルネック | 全員。進捗を語る前に |
-| [architecture.md](./architecture.md) | 4 階層アーキテクチャ、16 リポジトリ依存グラフ、本リポジトリの位置(グラフ外)、名詞/動詞ルール、mc-playground-kit の devDependency 専用ルール | 全員 |
+| [step2-status.md](./step2-status.md) | plan.md §6 Step 2 のプレビュー条件と、機能 parity を混同しないための横断確認方法 | 全員。進捗を語る前に |
+| [feature-inventory.md](./feature-inventory.md) | 所有者・実装状態・管理方針・根拠ファイルの正本 | 実装者・レビュアー |
+| [architecture.md](./architecture.md) | 4 階層アーキテクチャ、15 runtime リポジトリ依存グラフ、portable contract、本リポジトリの位置(グラフ外)、名詞/動詞ルール | 全員 |
+| [portable-chunk.md](./portable-chunk.md) | Chunk data と固定 wire format の portable 契約 | 実装者 |
+| [portable-light-grid.md](./portable-light-grid.md) | Chunk の sky/block light packed data 契約 | 実装者 |
 | [responsibility.md](./responsibility.md) | 持つもの / 持たないもの。**手元の作業を壊さない**という絶対規則 | 実装者・レビュアー |
 | [public-api.md](./public-api.md) | 純粋層の API と契約 | 実装者 |
 | [testing.md](./testing.md) | テスト戦略。**実ネットワーク clone をするテストは書かない** | 実装者・レビュアー |
@@ -46,7 +49,8 @@
 1. **workflow.md** — 何をどう使うのか
 2. **manifest.md** — なぜ `repos.json` をコミットするのか、`pnpm sync` が何を壊さないのか
 3. **responsibility.md** — 実装するとき / レビューするとき
-4. **public-api.md** — 純粋層の契約
+4. **feature-inventory.md** — 公式機能の所有境界と状態
+5. **public-api.md** — 純粋層の契約
 
 ## 3. コマンド早見
 
@@ -62,8 +66,10 @@
 | `pnpm update:manifest:latest:dry` | 同上。何も書かない |
 | `pnpm check:workspace` | clone 済みの各リポジトリで `pnpm verify` |
 | `pnpm check:workspace typecheck` | 別のスクリプトを指定して横断実行 |
-| `pnpm check:mirrors` | 手書きミラーと元リポジトリの**形**を突き合わせる。`verify` に入っている |
-| `pnpm check:repoint` | ミラーを実際に消して import を張り替え、**`tsc` を走らせる**。`verify` には入っていない([testing.md](./testing.md) §6.1) |
+| `pnpm check:features` | 機能棚卸しの不変条件と、checkout 済み根拠ファイルを検査 |
+| `pnpm check:portable` | root の portable Chunk/light 契約と clone 済み runtime の実値を突合。未 clone は理由つきで skip |
+| `pnpm check:mirrors` | 手書きミラーと元リポジトリの**形**を突き合わせる。CI の別ステップ |
+| `pnpm check:repoint` | ミラーを実際に消して import を張り替え、**`tsc` を走らせる**。`verify` には入っていない([testing.md](./testing.md) §6.1)。CI の別ステップ |
 | `pnpm verify` | **このリポジトリ自身**の検査。空の `repos/` でも通る |
 
 ## 4. 絶対規則
@@ -84,14 +90,8 @@
 
 ## 5. 現状
 
-- **`repos.json` の 15 件はすべて `"unpinned"`。** 15 リポジトリのほとんどがまだ存在しないため。
-  架空の SHA で埋めるより、そう書いてあるほうがよい。
-  `pnpm check:workspace` が毎回この状態を報告する
-- **`repos/` は空。** `pnpm sync` が実際に動くのは、リポジトリが GitHub に作られてから
-- **changesets 運用は未決。** [versioning.md](./versioning.md) §6
-- **ロスターの publish は未実装。** 現在は 16 リポジトリが手作業でミラーしている
-  ([architecture.md](./architecture.md) §3.1)
-- **plan.md §6 Step 2 の完了条件「内蔵プレビューが操作可能」を満たすリポジトリは 0 / 15。**
-  `apps/` ディレクトリがどのリポジトリにも無く、`mc-playground-kit` を依存に持つリポジトリも 0 件である。
-  0 が 15 個並んでいるのではなく、publish 未着手という**1 本の連鎖**の帰結である
-  ([step2-status.md](./step2-status.md))
+- `repos.json` は下流リポジトリの pin を記録し、`pnpm sync` はその状態を `repos/` に再現する
+- `repos/` は gitignore 対象で、空または部分的な状態も正常。workspace、mirror、repoint、feature inventory の各ゲートは未 checkout を理由付きで skip する
+- `pnpm check:features` が全リポジトリの所有境界・状態・根拠パスを横断監査する。詳細は [feature-inventory.md](./feature-inventory.md)
+- 公式 Minecraft parity の完了は宣言しない。`partial`、`unimplemented`、`deferred`、`blocked` の項目を棚卸しに残し、実装は各所有リポジトリで進める
+- changesets の扱いは [versioning.md](./versioning.md) §6 に従う

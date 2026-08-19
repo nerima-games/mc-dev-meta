@@ -4,17 +4,19 @@
 
 | レイヤ | 検証手段 | 現状 |
 | --- | --- | --- |
-| **同期判断**(最重要) | 全状態 × 全エントリの網羅 + 破壊的コマンドの不在 + 冪等性 | `test/sync-plan.test.ts`(52 tests) |
-| マニフェスト | パース・検証・pin・シリアライズ + **コミット済み repos.json** | `test/manifest.test.ts`(43 tests) |
-| ピン計画 | pin / unpinned・remote 観測からの決定 | `test/pin-plan.test.ts`(19 tests) |
-| ロスター | 16 件・階層・グラフ | `test/roster.test.ts`(14 tests) |
-| ワークスペース実行 | **空の repos/** ・部分・完全・未管理ディレクトリ | `test/workspace.test.ts`(20 tests) |
-| 張り替え計画 | 診断のフィンガープリント・baseline との差分・known findings | `test/repoint-plan.test.ts`(48 tests) |
-| **ミラー突合**(横断) | 一致・定数 drift・タグキー drift・brand の refinement drift・union の arm 欠落・**能力フラグ drift・プロパティ列 drift**・未 clone の skip | `test/mirror-contract.test.ts`(70 tests) |
-| 型の形の読み取り | 手書き union と tsc の union の**両方の綴り**・コメント/文字列の除去・`api-lock.md` | `test/type-shape.test.ts`(22 tests) |
+| **同期判断**(最重要) | 全状態 × 全エントリの網羅 + 破壊的コマンドの不在 + 冪等性 | `test/sync-plan.test.ts` |
+| マニフェスト | パース・検証・pin・シリアライズ + **コミット済み repos.json** | `test/manifest.test.ts` |
+| ピン計画 | pin / unpinned・remote 観測からの決定 | `test/pin-plan.test.ts` |
+| ロスター | 16 件・階層・グラフ | `test/roster.test.ts` |
+| ワークスペース実行 | **空の repos/** ・部分・完全・未管理ディレクトリ | `test/workspace.test.ts` |
+| 張り替え計画 | 診断のフィンガープリント・baseline との差分・known findings | `test/repoint-plan.test.ts` |
+| **ミラー突合**(横断) | 一致・定数 drift・タグキー drift・brand の refinement drift・union の arm 欠落・**能力フラグ drift・プロパティ列 drift・ロスター drift**・未 clone の skip | `test/mirror-contract.test.ts`, `test/mirror-roster.test.ts` |
+| 機能棚卸し | 状態・所有境界・証拠メタデータの純粋な検証と実在パスの確認 | `test/feature-inventory.test.ts`, `pnpm check:features` |
+| Portable 契約 | root の Chunk/light 定数・座標正規化・block index・packed-light 操作と clone 済み runtime の実値 parity | `pnpm check:portable` |
+| 型の形の読み取り | 手書き union と tsc の union の**両方の綴り**・コメント/文字列の除去・`api-lock.md` | `test/type-shape.test.ts` |
 | `scripts/` の I/O | **検証しない**(§4) | — |
 
-現在 **288 tests / 8 files**、`pnpm test` で 2 秒前後。
+テスト数やファイル数は固定値として文書化せず、`pnpm test` で現在のテスト全体を実行する。
 
 **依存境界(ホワイトリスト・循環検査・`Date.now()` 禁止)を検査していた
 `test/check-dependency-whitelist.test.ts` と、それが検査していた
@@ -163,13 +165,15 @@ CI は `repos/` が空の状態で回る。そこで:
 ```console
 $ pnpm verify          # typecheck && lint && test(TEST_STANDARD.md §1)
 $ pnpm check:workspace # exit 0、「空です」と言う
-$ pnpm check:mirrors   # exit 0、「比較できたミラーは 0/15」と言う。CI では verify とは別ステップ
+$ pnpm check:features  # root のカタログを検査。未 clone の証拠は理由つきで skip
+$ pnpm check:portable  # Chunk/light 契約を runtime export と比較。未 clone は理由つきで skip
+$ pnpm check:mirrors   # 比較できたミラーを検査。未 clone は理由つきで skip
 ```
 
 もし `pnpm verify` が 15 リポジトリの存在を要求したら、
 **15 リポジトリを取ってくるツールが、最後に信用できるようになるもの**になってしまう。
 
-`pnpm check:mirrors` は `verify` の中で唯一、結果が**リポジトリ外のファイルに依存する**。
+`pnpm check:mirrors` はこのローカル基本ゲートの外側で、結果が**リポジトリ外のファイルに依存する**。
 同じコミットが、あるマシンでは通り別のマシンでは落ちうる — それは事実であり、そこが要点である。
 合成状態は `repos.json` で pin されており、pin された 2 リビジョンの食い違いは
 **mc-dev-meta のこのコミットの性質**であって、他のどのリポジトリのコミットの性質でもない。
@@ -200,7 +204,7 @@ mc-kernel はブロックの振る舞いモデルを設計時点で**2 つに割
 `MIRROR_SPECS` は長らく**前者しか probe していなかった**。
 後者を転記しているミラーは probe を 1 件も持たず、それでも `ok` と報告されていた。
 
-これは仮定の話ではない。`mc-worldgen/domain/kernel-vocabulary.ts` は
+これは仮定の話ではない。以前の `mc-worldgen/domain/kernel-vocabulary.ts` は
 kernel が 24 行持っている非不透明ブロックを **6 行**しか転記しておらず、
 ladder・cobweb・11 種の植物・rail・cactus・slab がすべて `'opaque'` の既定値に落ちていた。
 **転記漏れはエラーにならず、既定値として読まれる** — `opacity` の既定値は `'opaque'`、
@@ -214,13 +218,13 @@ kernel 自身の audit §4.9.1(d) がこの規則を既に書いている —
 「ミラーが転記している能力の数より probe が少なければ、そのチェックは検査していない成功を報告する」。
 **プロパティ probe が 0 件の配列は、その文の極限形である。**
 
-現在 probe されている列:
+現在、mirror probe と portable 契約が監視している列:
 
-| ミラー | export | 列 |
+| 契約 | export | 列 |
 | --- | --- | --- |
-| `mc-worldgen/domain/kernel-vocabulary.ts` | `opacityOfBlockId` | `opacity` |
-| `mc-worldgen/domain/kernel-vocabulary.ts` | `lightEmissionOfBlockId` | `lightEmission` |
-| `mx-gameplay/domain/block-vocabulary.ts` | `supportRuleOfBlockId` | `supportRule` |
+| `mc-worldgen` の mc-kernel 直接依存（`pnpm check:portable`） | `opacityOfBlockId` | `opacity` |
+| `mc-worldgen` の mc-kernel 直接依存（`pnpm check:portable`） | `lightEmissionOfBlockId` | `lightEmission` |
+| `mx-gameplay/domain/block-vocabulary.ts` の mirror probe | `supportRuleOfBlockId` | `supportRule` |
 
 **probe は owner の id 全域を閉じて比較する**(現状 0..255)。
 ミラー側のテーブルが尽きたところで止めると、行が欠けたミラーと「一致」してしまう。
@@ -234,8 +238,8 @@ kernel 自身の audit §4.9.1(d) がこの規則を既に書いている —
 
 **能力 probe と違い、プロパティ probe は「元リポジトリの barrel に載っているか」の
 検査を免除しない。** 能力 probe はそれを免除する必要がある(probe 先の述語は
-第三のリポジトリのものだから)が、その免除こそが `chunk-store-port.ts` の
-壊れた張り替え約束を 4 件隠していたものである。
+第三のリポジトリのものだから)が、その免除こそが、過去の ChunkStore
+ミラーの壊れた張り替え約束を 4 件隠していたものである。
 kernel は `opacityOfBlockId` 等を自分の barrel に載せているので、
 プロパティ probe は免除を必要とせず、**免除しない**。
 
@@ -248,7 +252,7 @@ kernel は `opacityOfBlockId` 等を自分の barrel に載せているので、
 `pnpm check:repoint` は実際に張り替えて `tsc` を走らせる。
 
 ```console
-$ pnpm check:repoint   # repos/ が空なら exit 0、「0/3 を試行」と言う
+$ pnpm check:repoint   # 未 clone のリポジトリは理由つきで skip
 ```
 
 | 状況 | 結果 |
@@ -269,7 +273,7 @@ baseline に無い診断だけが張り替えのせいにされる。
 
 ### なぜ `verify` に入れないのか
 
-`check:mirrors` は `verify` に**入っている**(§6)。その理由の半分はここにも当てはまるが、
+`check:mirrors` は CI の独立ステップとして実行する(§6)。その理由の半分はここにも当てはまるが、
 半分は当てはまらない。**このゲートはタダではない。**
 3 リポジトリをコピーして、それぞれの `typecheck` が名指す project ごとに
 baseline と張り替え後の 2 回、合計 9 回 `tsc` を回す(実測 13 秒)。
@@ -279,7 +283,7 @@ baseline と張り替え後の 2 回、合計 9 回 `tsc` を回す(実測 13 �
 
 CI・定期実行・publish 前には回す。
 `verify` が本当に守っている「drift が気付かれずに入る」ほうは、
-これらのファイルについては毎回走る `check:mirrors` が既に押さえている。
+これらのファイルについては CI と明示実行時に走る `check:mirrors` が既に押さえている。
 このゲートが答えるのは、**誰かがバージョンを凍結しようとする日にだけ必要になる**、より大きな問いである。
 
 ### 最初に走らせて分かったこと
@@ -308,29 +312,18 @@ CI・定期実行・publish 前には回す。
 ## 7. カバレッジ
 
 計測は常に動いている(`pnpm test:coverage`)。対象は `src/index.ts` と `src/domain/**`
-のみで、`scripts/**` と `repos/**` は除外している(§4)。
+のみで、`scripts/**` と `repos/**` は除外している(§4)。スクリプトは
+`check:workspace` / `check:features` / `check:portable` / `check:mirrors` / `check:repoint` の実行ゲートで検査する。
 
-**4 指標 99% の閾値ゲートは有効。** TEST_STANDARD.md §3 の org 決定により、
-段階移行や個別リポジトリの猶予なしで全 16 リポジトリに適用された。移行時点の実測:
-
-| 指標 | 実測 | 99% 判定 |
-| --- | --- | --- |
-| statements | 93.78% | 未達 |
-| branches | 89.19% | 未達 |
-| functions | 97.82% | 未達 |
-| lines | 93.78% | 未達 |
-
-4 指標とも未達であり、**このゲートを有効にした時点で CI は赤くなる**。これは
-TEST_STANDARD.md §4 が mc-audio / mc-compose / mc-playground-kit について明言している
-のと同じ扱いで、しきい値を緩める理由にはしない。`src/index.ts` は再エクスポートのみの
-バレルで、どのテストも `src/index.ts` 経由では import していないため 0% と報告される
-— `src/domain/*` を直接 import する現在のテストの書き方(§2)の帰結であり、
-バレル経由の import を検証するテストを足すか、既知の空白として記録するかは今後の課題。
+**4 指標 100% の閾値ゲートは有効。** この repository の純粋なドメイン層は、
+statements / branches / functions / lines のすべてを検査する。`src/index.ts` は再エクスポートのみの
+バレルで実行文がなく、Vitest 4 の集計ではカウンタを持たない。実行可能な `src/domain/*` は
+4 指標すべてを満たし、スクリプトは実行ゲートで検査する。
 
 ## 8. まだ書いていないテスト
 
 | テスト | 前提 |
 | --- | --- |
-| `src/index.ts` バレル経由の re-export を実際に import して検証する | §7 のカバレッジ空白を埋める |
+| `src/index.ts` バレル経由の re-export を実際に import して検証する | 公開エントリポイントの契約 |
 | プロパティテスト(任意の状態列で `settle` が収束する) | fast-check を devDependency に足すかどうか。依存ゼロ方針との兼ね合い |
 | `update:manifest` の統合テスト | 実 git が要る。**書かない**方針(§4) |
