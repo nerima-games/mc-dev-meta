@@ -17,6 +17,8 @@ portable な Chunk/light data contract を管理し、合成状態を `repos.jso
 | git を実際に叩く | `scripts/sync-repos.ts` | 不純 |
 | マニフェストの pin 更新 | `scripts/update-manifest.ts` | 不純 |
 | 全リポジトリ横断チェック | `scripts/check-workspace.ts` | 不純 |
+| 機能棚卸しと根拠ファイルの監査 | `src/domain/feature-inventory.ts`, `scripts/check-feature-inventory.ts` | 純粋 / 不純 |
+| portable contract と runtime 実値の突合 | `src/domain/voxel-chunk.ts`, `src/domain/light-grid.ts`, `scripts/check-portable-contract.ts` | 純粋 / 不純 |
 | pnpm workspace 定義 | `pnpm-workspace.yaml` | — |
 | 合成状態の記録 | `repos.json`(コミット済み) | — |
 

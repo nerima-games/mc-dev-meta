@@ -189,6 +189,8 @@ plan.md §6 Step 3:
 | [docs/architecture.md](./docs/architecture.md) | 4 階層、15 runtime リポジトリ依存グラフ、portable contract、参照実装との対比 |
 | [docs/responsibility.md](./docs/responsibility.md) | 持つもの / 持たないもの。作業を壊さない仕組み |
 | [docs/feature-inventory.md](./docs/feature-inventory.md) | 公式機能の状態、所有境界、証拠の更新手順 |
+| [docs/portable-chunk.md](./docs/portable-chunk.md) | Chunk data と固定 wire format の portable 契約 |
+| [docs/portable-light-grid.md](./docs/portable-light-grid.md) | Chunk の sky/block light packed data 契約 |
 | [docs/public-api.md](./docs/public-api.md) | 純粋層の API と契約 |
 | [docs/testing.md](./docs/testing.md) | テスト戦略 |
 | [docs/versioning.md](./docs/versioning.md) | publish されない理由、4 週間 API ロック |

@@ -50,7 +50,10 @@
 2. **manifest.md** — なぜ `repos.json` をコミットするのか、`pnpm sync` が何を壊さないのか
 3. **responsibility.md** — 実装するとき / レビューするとき
 4. **feature-inventory.md** — 公式機能の所有境界と状態
-5. **public-api.md** — 純粋層の契約
+5. **architecture.md** — リポジトリの境界と依存グラフ
+6. **portable-chunk.md** / **portable-light-grid.md** — portable data contract
+7. **public-api.md** — 純粋層の契約
+8. **testing.md** — 検証ゲートとテスト戦略
 
 ## 3. コマンド早見
 

@@ -151,6 +151,8 @@ $ nix flake check --no-write-lock-file --no-build --all-systems
 
 ゲートを通過した単位だけを明示的な pathspec でコミットし、ローカル `main` へ反映する。反映後はその単位の差分が残っていないことを確認し、完了した一時 branch / worktree だけを削除する。他の session が使用中の worktree、branch、nested repository は対象にしない。リモートへ送る場合は、別途 push の承認を得る。
 
+`.corepack/` など、devShell や `corepack enable` が生成する環境依存のリンクは、ソースの作業単位に含めない。削除前に、ソース差分が `main` に反映済みであることと、残る差分が生成物だけであることを確認する。
+
 ### 3.4 合成状態を記録する
 
 ```console
