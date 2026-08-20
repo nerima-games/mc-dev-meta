@@ -129,6 +129,7 @@ $ pnpm check:repoint
 `check:features` は root の機能カタログ、所有境界、root と clone 済み下流リポジトリの証拠パスを検証する。
 未 clone のリポジトリは理由つきで skip される。これは runtime の実装や公式 Minecraft の parity 完了を証明するゲートではない。
 `check:portable` は root の Chunk/light 契約を mc-kernel と mc-worldgen の runtime export の実値と比較する。
+未 clone の owner は理由を表示して skip するが、runtime comparison が一つも実行されなければ成功扱いにしない。
 workspace / portable / mirror / repoint も `pnpm verify` とは別の実行ゲートであり、依存する checkout の状態を結果に明示する。
 
 ### 3.3.1 作業単位を `main` へ反映する

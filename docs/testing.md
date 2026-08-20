@@ -166,7 +166,7 @@ CI は `repos/` が空の状態で回る。そこで:
 $ pnpm verify          # typecheck && lint && test(TEST_STANDARD.md §1)
 $ pnpm check:workspace # exit 0、「空です」と言う
 $ pnpm check:features  # root のカタログを検査。未 clone の証拠は理由つきで skip
-$ pnpm check:portable  # Chunk/light 契約を runtime export と比較。未 clone は理由つきで skip
+$ pnpm check:portable  # Chunk/light 契約を runtime export と比較。未 clone は理由を表示し、比較ゼロなら失敗
 $ pnpm check:mirrors   # 比較できたミラーを検査。未 clone は理由つきで skip
 ```
 

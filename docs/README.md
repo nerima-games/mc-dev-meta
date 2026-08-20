@@ -70,7 +70,7 @@
 | `pnpm check:workspace` | clone 済みの各リポジトリで `pnpm verify` |
 | `pnpm check:workspace typecheck` | 別のスクリプトを指定して横断実行 |
 | `pnpm check:features` | 機能棚卸しの不変条件と、checkout 済み根拠ファイルを検査 |
-| `pnpm check:portable` | root の portable Chunk/light 契約と clone 済み runtime の実値を突合。未 clone は理由つきで skip |
+| `pnpm check:portable` | root の portable Chunk/light 契約と clone 済み runtime の実値を突合。未 clone は理由を表示し、比較対象ゼロは失敗 |
 | `pnpm check:mirrors` | 手書きミラーと元リポジトリの**形**を突き合わせる。CI の別ステップ |
 | `pnpm check:repoint` | ミラーを実際に消して import を張り替え、**`tsc` を走らせる**。`verify` には入っていない([testing.md](./testing.md) §6.1)。CI の別ステップ |
 | `pnpm verify` | **このリポジトリ自身**の検査。空の `repos/` でも通る |
