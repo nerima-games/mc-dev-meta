@@ -5,10 +5,10 @@
 - **`version`**: `0.1.0`
 - **`private: true`**。**publish されない。永久に。**
 - `publishConfig` を持たない(他の 15 リポジトリとの意図的な違い)
-- `dependencies` を持たない。`effect` すら入っていない
+- `dependencies` は kernel の branded 値と service 契約に使う `effect` だけを持つ
 
-`test/workspace.test.ts` が `private: true` と `publishConfig` 不在と
-`dependencies` 不在を固定している。事故で publish されることはない。
+`test/workspace.test.ts` が `private: true`、`publishConfig` 不在、そして許可された
+`dependencies` の集合を固定している。事故で publish されることはない。
 
 **このリポジトリの `version` はほぼ意味を持たない。** 誰も install しないためである。
 実質的な「バージョン」は `repos.json` のコミット履歴であり、それが記録するのは
@@ -23,12 +23,12 @@ plan.md §6 Step 0 item 2 / §6 Step 3 は、当初こう定めていた:
 > 界面が安定した(**API ロック 4 週間無変更**)リポジトリから GitHub Packages 等へ npm 公開 +
 > changesets 運用に切り替え。それまでは dev-meta workspace 統合で開発
 
-**この「4 週間、api-lock.md が無変更」という日数計測ベースの自動ゲートは、org 全体で廃止された**
-(RELEASE_STANDARD.md §4.1)。`api-lock.md` というファイル自体も、それを検査していた
-`pnpm api:check` / `pnpm api:update` も、全 16 リポジトリから撤去されている(API_STANDARD.md §4)。
-このリポジトリが持っていた `scripts/check-api-lock-window.ts`(`pnpm check:api-window`)—
-他 15 リポジトリの `api-lock.md` の鮮度・経過日数を横断で報告するツール — も、
-測る対象そのものが無くなったため同時に削除した。
+**この「4 週間、api-lock.md が無変更」という日数計測ベースの自動ゲートは、昇格条件から外す
+方針になった**(RELEASE_STANDARD.md §4.1)。一方、現在の `repos.json` が指す snapshot には
+`api-lock.md` と、それを検査する `pnpm api:check` / `pnpm api:update` が残るリポジトリがある
+(API_STANDARD.md §4)。このリポジトリが持っていた `scripts/check-api-lock-window.ts`
+(`pnpm check:api-window`) は存在せず、残存するロックの鮮度・経過日数を横断で昇格条件には
+しない。
 
 **新しい昇格ポリシーは、日数や指標による自動ゲートではなく、maintainer(take)による裁量判断**
 である(RELEASE_STANDARD.md §4.2)。判断材料は都度異なってよく、事前にすべて明文化することは

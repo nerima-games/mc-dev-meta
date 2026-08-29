@@ -2,8 +2,6 @@
  * The repository manifest: parsing and validation. PURE — no filesystem, no
  * git, no network.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * Why a committed manifest exists at all
  * ---------------------------------------------------------------------------
@@ -157,10 +155,10 @@ export type ManifestError =
 /**
  * A parse result.
  *
- * Hand-rolled rather than `Either` from `effect`: mc-dev-meta has NO runtime
- * dependencies at all. It is the tool that fetches the packages, so it cannot
- * be bootstrapped from them, and keeping its dependency list empty makes that
- * a fact rather than an intention.
+ * Hand-rolled rather than `Either` from `effect`: this parser owns a compact
+ * manifest-specific error contract and does not need an Effect runtime. The
+ * repository may use `effect` in the portable kernel, but the management parser
+ * remains independent of that representation.
  */
 export type Parsed<A> =
   | { readonly ok: true; readonly value: A }
@@ -254,7 +252,7 @@ export const parseManifest = (raw: string): Parsed<Manifest> => {
     // can start with '-'), so no fixture can drive this arm without breaking
     // the guarantee above it. Excluded from coverage rather than forced with a
     // fixture that could only reach it by first weakening `isValidRef`.
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (isOptionLike(ref.value)) {
       return fail({ _tag: 'InvalidRef', name: name.value, ref: ref.value })
     }
@@ -400,7 +398,7 @@ export const describeManifestError = (error: ManifestError): string => {
     // Structurally unreachable: every ManifestError tag is handled above, so
     // TypeScript only accepts this call because `error` has narrowed to
     // `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       return assertUnreachable(error)
   }

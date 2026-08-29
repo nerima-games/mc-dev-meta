@@ -3,7 +3,8 @@
 ## 責務
 
 **15 リポジトリを `repos/` に clone し、1 つの pnpm workspace として束ねる。
-そして合成状態を `repos.json` に記録する。**
+そして合成状態を `repos.json` に記録する。加えて、移植可能な Minecraft のデータと
+純粋なルールを `src/kernel/` に集約し、管理層とゲーム実行層の境界を検証する。**
 
 plan.md §6 Step 0 item 2:
 
@@ -33,12 +34,14 @@ plan.md §6 Step 0 item 2:
 
 ## 依存
 
-**無い。** `dependencies` が存在せず、`effect` すら入っていない。
+`effect` は `Brand`、`Context`、`Effect`、`Layer` を使う `src/kernel/` の公開契約のための
+意図的な runtime dependency である。逆に、管理スクリプトは `mc-*` パッケージから
+ブートストラップされず、Node.js の filesystem / process / network I/O は `scripts/` に隔離する。
+`domain/manifest.ts` の `Parsed<A>` は、manifest parser の小さなエラー契約を保つための
+ローカルなデータ型であり、依存ゼロの名残ではない。
 
-15 リポジトリを取ってくるツールが、それらからブートストラップされてはならないためである。
-`domain/manifest.ts` の `Parsed<A>` が `Either` の手作り版なのはこの理由による。
-
-依存グラフの上でも mc-dev-meta は**グラフの外**にいる。誰にも依存せず、誰からも依存されない。
+リポジトリ依存グラフの上では mc-dev-meta は**グラフの外**にいる。ここでいうグラフは
+管理対象リポジトリ間の `dependsOn` であり、ルートの npm runtime dependency を否定しない。
 
 ## クイックスタート
 
@@ -77,13 +80,19 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 | `pnpm check:workspace <script>` | 別のスクリプトを指定して横断実行 |
 | `pnpm typecheck` | `tsconfig.build.json`(純粋層)と `tsconfig.test.json`(scripts + tests)を型検査 |
 | `pnpm lint` | oxlint(このリポジトリ唯一の lint / format 設定)。**`--deny-warnings` 付きで走る**ため、`warn` のルールもビルドを落とす（`.oxlintrc.json` は 5 カテゴリすべてと個別 67 ルールが `warn`、`error` は 4 つだけ。このフラグが無かった頃は実質その 4 つしかゲートになっていなかった） |
-| `pnpm test` | vitest(**プレーン vitest**。`@effect/vitest` は使わない — 依存ゼロのため) |
-| `pnpm test:coverage` | カバレッジ計測。4 指標 99% の閾値ゲート付き(下記「現状」参照) |
+| `pnpm test` | vitest(**プレーン vitest**。`@effect/vitest` に依存せず、テストハーネスを runtime 実装から分離) |
+| `pnpm test:coverage` | カバレッジ計測。4 指標 100% の閾値ゲート付き(下記「現状」参照) |
 | `pnpm check:mirrors` | 手書きミラー(`domain/kernel-vocabulary.ts` など)を**ミラー元リポジトリと突き合わせる**。下記 |
-| `pnpm verify` | `typecheck && lint && test`。CI と同じ内容。`check:mirrors` は CI では別ステップとして走る(TEST_STANDARD.md §1) |
+| `pnpm check:features` | `src/` と `test/` に集約した機能証拠を監査。`partial` / `missing` があれば非ゼロ |
+| `pnpm verify` | `typecheck && lint && test:coverage`。CI と同じ内容。`check:mirrors` は CI では別ステップとして走る(TEST_STANDARD.md §1) |
 
 **`pnpm verify` は `repos/` が空でも通る。** これは配慮ではなく責務である
 — 15 リポジトリを取ってくるツールが、最後に信用できるようになるものであってはならない。
+
+`pnpm check:features` は `verify` の一部ではない。`src/domain/feature-register.ts` の
+証拠仕様をローカルの統合ソースへ適用し、`complete` 以外を非ゼロで報告する。このコマンドは
+ゲーム runtime を実装するものでも、登録簿にない Minecraft の全公式機能やブラウザ／ネットワーク
+アダプタを網羅したことを示すものでもない。未移植の gap を隠さず、移植境界を観測するゲートである。
 
 ## `pnpm check:mirrors` — このリポジトリにしか置けない検査
 
@@ -99,12 +108,12 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 各リポジトリには `*-mirror.test.ts` があり、形と `Context.Tag` のキーを両方向に pin している。
 **それは「書き写した結果」を pin しているのであって、「書き写し元」ではない。**
 元は依存関係にない別リポジトリにあり、publish されるまで依存関係にできない。
-だからミラーと元は乖離でき、しかも 16 リポジトリすべてが green のままでいられる。
+だからミラーと元は乖離でき、各リポジトリ自身のテストが green でも横断的な差分を見逃しうる。
 
 **mc-dev-meta は、両方のパッケージが 1 つのビルドに同時に存在する組織内で唯一の場所である。**
 この検査がここにあり、他のどこにも置けない理由はそれに尽きる。
 
-比較は 3 系統に分かれる(`domain/mirror-contract.ts` に全論拠がある):
+比較の実装は責務別に分かれる。`domain/mirror-registry.ts` は登録簿、`domain/mirror-model.ts` は契約データと観測値、`domain/mirror-comparison.ts` は純粋比較、`domain/mirror-run.ts` は実行結果の集約、`domain/mirror-finding-report.ts` は検出結果の表示、`domain/repository-provenance.ts` と `domain/mirror-path.ts` は provenance とパス生成を担当する:
 
 1. **値** — 両方の実モジュールを import して実行する。定数は直接比較、`Brand.refined`
    は固定サンプル列に対する accept / reject / throw のベクタで比較する
@@ -113,9 +122,10 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
    食い違った 2 つは実行時に別サービス・型検査は両方通る。
 3. **型の形** — 型は実行時に存在しないので、ミラー元の**コミット済み `api-lock.md`**
    (tsc の declaration emit で生成されていた)とミラーのソースを、同じパーサで読む。
-   `api-lock.md` とそれを生成・検査していた `pnpm api:check` は org 全体で廃止された
-   (API_STANDARD.md §4)。**このリポジトリの `pnpm check:mirrors` はミラー元が
-   `api-lock.md` をコミットしていることを前提に組まれているため**、ミラー元リポジトリの
+   `api-lock.md` の無変更期間を昇格条件にする運用は廃止方針になった。一方、現在の
+   `repos.json` が指す snapshot には `api-lock.md` と `pnpm api:check` が残るリポジトリがある。
+   **このリポジトリの `pnpm check:mirrors` はミラー元が
+   `api-lock.md` をコミットしている間だけ型の形を比較する**ため、ミラー元リポジトリの
    移行で同ファイルが削除されると、その 1 スペックは(値・タグキーの比較も含めて)
    まるごと `skip`(理由付き)として報告されるようになる。`repos/` が空・部分的なときと
    同じ扱いであり、CI を落とさない。比較するのは**メンバ名・省略可否・union の arm** で、
@@ -191,7 +201,9 @@ plan.md §6 Step 3:
 **この表の Tier 境界(循環禁止・推移閉包の禁止・宣言と実体の一致・kernel 例外・
 mc-playground-kit の扱い)は、各リポジトリ own の `.oxlintrc.json#no-restricted-imports`
 で検査する** (DEPENDENCY_POLICY.md)。各リポジトリが手書きの依存グラフを
-`scripts/check-dependency-whitelist.ts` として持つ方式は org 全体で廃止された。
+`scripts/check-dependency-whitelist.ts` として持つ方式は、新しい mc-dev-meta 側の重複実装にはしない。
+ただし、現在の `repos.json` が指す snapshot にはこのスクリプトと `pnpm check:deps` が残るため、
+撤去完了とは扱わず、各リポジトリの `verify` を `pnpm check:workspace` から実行する形で観測する。
 
 このリポジトリは **ロスターの参照コピー**(`domain/repository-roster.ts`)を持つ。
 mc-dev-meta は依存グラフの外(層外)にあり、`@nerima-games/*` を 1 つも import しないため、
@@ -203,13 +215,14 @@ mc-dev-meta は依存グラフの外(層外)にあり、`@nerima-games/*` を 1 
 oxlint 0.12 は `no-restricted-syntax` も `no-restricted-properties` も実装しておらず、
 `no-restricted-globals` は `oxlint --rules` の一覧に出るものの実装されていない(0.12.0 で実測確認済み)。
 
-この禁止をかつて実装していた `scripts/check-dependency-whitelist.ts` は org 全体で廃止された
-(DEPENDENCY_POLICY.md)。ツールによる代替の強制は無く、レビューのみで守る
+この禁止は現在の snapshot では各リポジトリの `scripts/check-dependency-whitelist.ts`
+(`pnpm check:deps`) が検査している。mc-dev-meta 自身はこのスクリプトを複製せず、
+`pnpm check:workspace` で兄弟リポジトリの `verify` を観測する
 (oxlint がこの種の禁止を実装した時点でここに追加する)。
 
 ## 現状
 
-**このリポジトリはまだ叩き台(pre-audit first cut)である。**
+**ルートの監査・同期基盤は実装済みで、兄弟リポジトリの機能完成度は別管理である。**
 
 - **`repos.json` の 15 件は実 SHA に固定済み。** 15 リポジトリが GitHub 上に作成された後、
   `pnpm update:manifest` で固定した。それ以前は全件 `"unpinned"` だった —— 架空の SHA で
@@ -220,15 +233,16 @@ oxlint 0.12 は `no-restricted-syntax` も `no-restricted-properties` も実装�
   update:manifest が `pin <- repos/ HEAD` を書くのでループが閉じており、
   6 リポジトリに push しても**両コマンドとも成功を報告して何もしなかった**。
   `--latest` がこれを破る。詳細は [docs/manifest.md](./docs/manifest.md) §5
-- **ロスターの publish は未実装。** 現在は 16 リポジトリが手作業でミラーしている
+- **ロスターを publish する仕組みは未実装。** このルートが管理する同期対象は 15 件で、ミラー削除後の依存切替は各兄弟リポジトリ側で行う
+- **機能完成度の入口は `pnpm check:features`。** `feature-register.ts` に登録された限定的な
+  証拠仕様を同期済み snapshot へ適用し、実装済み・部分実装・未実装を分けて報告する。
+  登録簿にない機能まで実装済みとは推論しない
 - **changesets は対象外。** `private: true`、永久に publish されない
   ([RELEASE_STANDARD.md §0](https://github.com/nerima-games/.github/blob/main/RELEASE_STANDARD.md))
-- **カバレッジ 4 指標 99% ゲートは有効。** TEST_STANDARD.md §3 の org 決定により、
-  猶予期間なしで有効化した。移行時点の実測(`pnpm test:coverage`)は
-  statements 93.78% / branches 89.19% / functions 97.82% / lines 93.78% で、
-  4 指標中 3 指標が未達 —— したがって **CI はこのゲートで赤くなる**。これは想定内であり
-  (TEST_STANDARD.md §4 が mc-audio / mc-compose / mc-playground-kit を同様に扱う)、
-  ゲートを緩める理由にはしない
+- **カバレッジ 4 指標 100% ゲートは有効。** `pnpm test:coverage` は
+  `src/index.ts` と `src/domain/**` を対象に、statements / branches / functions /
+  lines のすべてで100%を要求する。`scripts/**`・`repos/**`・型で到達不能な
+  `assertUnreachable` は責務上の除外として設定に明記している。現在の実測は4指標とも100%である。
 
 > **注意**: ツールチェーンは `devenv.nix` から `flake.nix` + `flake.lock` に移行済みである。
 > `flake.lock` はコミットされているので、`nix develop`（`.envrc` は `use flake`）は

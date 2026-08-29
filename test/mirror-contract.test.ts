@@ -17,15 +17,10 @@ import {
   compareMirror,
   compareSurfaces,
   DECLARED_DIVERGENCES,
-  describeMirrorFinding,
   describeMirrorRun,
-  describeProvenance,
   failingOutcomes,
   fingerprintFinding,
-  isOffPin,
   KNOWN_FINDINGS,
-  MIRROR_SOURCE_NOTE,
-  MIRROR_SPECS,
   unprobedColumns,
   mirrorRunExitCode,
   REFINEMENT_SAMPLES,
@@ -37,10 +32,13 @@ import {
   type MirrorOutcome,
   type MirrorSpec,
   type PropertyObservation,
-  type RepositoryProvenance,
   type SourceObservation,
   type ValueObservation,
 } from '../src/domain/mirror-contract'
+import { MIRROR_SPECS } from '../src/domain/mirror-registry'
+import { describeMirrorFinding } from '../src/domain/mirror-finding-report'
+import { describeProvenance, isOffPin, MIRROR_SOURCE_NOTE } from '../src/domain/repository-provenance'
+import type { RepositoryProvenance } from '../src/domain/repository-provenance'
 import type { TypeShape } from '../src/domain/type-shape'
 
 // ---------------------------------------------------------------------------
@@ -475,6 +473,33 @@ describe('a value whose KIND differs fails even when nothing else does', () => {
       { _tag: 'KindDiffers', symbol: 'DEFAULT_LAYER', mirror: 'a Layer factory', source: 'a plain function' },
     ])
   })
+
+  it('accepts two Opaque exports of the same kind', () => {
+    const mirror: MirrorObservation = {
+      ...agreeingMirror,
+      values: [...agreeingMirror.values, { _tag: 'Opaque', name: 'DEFAULT_LAYER', kind: 'plain function' }],
+    }
+    const source: SourceObservation = {
+      ...agreeingSource,
+      values: [...agreeingSource.values, { _tag: 'Opaque', name: 'DEFAULT_LAYER', kind: 'plain function' }],
+      published: new Set([...agreeingSource.published, 'DEFAULT_LAYER']),
+    }
+
+    expect(compareSurfaces(spec, mirror, source)).toStrictEqual([])
+  })
+
+  it('accepts a mirrored value that the source publishes without an observed value entry', () => {
+    const mirror: MirrorObservation = {
+      ...agreeingMirror,
+      values: [...agreeingMirror.values, { _tag: 'Opaque', name: 'DEFAULT_LAYER', kind: 'plain function' }],
+    }
+    const source: SourceObservation = {
+      ...agreeingSource,
+      published: new Set([...agreeingSource.published, 'DEFAULT_LAYER']),
+    }
+
+    expect(compareSurfaces(spec, mirror, source)).toStrictEqual([])
+  })
 })
 
 describe('a wrong capability id fails, and names the id and the block', () => {
@@ -838,6 +863,19 @@ describe('type shape', () => {
     }
 
     expect(rendered(drifted)).toContain('declares "setBlockFast", which mc-worldgen does not')
+  })
+
+  it('accepts a mirrored type that the source publishes without an observed shape entry', () => {
+    const mirror: MirrorObservation = {
+      ...agreeingMirror,
+      types: [...agreeingMirror.types, shape('PublishedOnly', [['value', false]])],
+    }
+    const source: SourceObservation = {
+      ...agreeingSource,
+      published: new Set([...agreeingSource.published, 'PublishedOnly']),
+    }
+
+    expect(compareSurfaces(spec, mirror, source)).toStrictEqual([])
   })
 
   it('fails when a member is optional on one side and required on the other', () => {

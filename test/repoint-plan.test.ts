@@ -14,13 +14,13 @@
  * `Diagnostic` per `tsc --pretty false` line, a `ProjectResult` per tsconfig,
  * with the baseline compile beside the repointed one.
  *
- * Plain vitest, not `@effect/vitest` and `it.effect` — this repository has no
- * runtime dependencies at all, not even `effect`, for the reason recorded in
- * `src/index.ts` and `src/domain/manifest.ts`: it is the tool that fetches the
- * packages and therefore cannot be bootstrapped from them.
+ * Plain vitest, not `@effect/vitest` and `it.effect` — these tests exercise
+ * synchronous decision data and keep the test harness independent of the
+ * Effect runtime used by the portable kernel. The management layer must not
+ * bootstrap itself from any managed repository package.
  */
 import { describe, expect, it } from 'vitest'
-import { MIRROR_SPECS } from '../src/domain/mirror-contract'
+import { MIRROR_SPECS } from '../src/domain/mirror-registry'
 import {
   classifyRepoint,
   describeRepointRun,
@@ -484,7 +484,7 @@ describe('classifyRepoint', () => {
     expect(outcome.introduced).toEqual([])
     expect(outcome.known).toEqual([{ project: 'tsconfig.test.json', diagnostic: introduced, entry }])
     // Recorded, reported, and NOT a failure — the same bargain KNOWN_FINDINGS
-    // strikes in domain/mirror-contract.ts.
+    // strikes in domain/mirror-registers.ts.
     expect(repointRunExitCode([outcome], [entry])).toBe(0)
   })
 

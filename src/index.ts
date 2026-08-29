@@ -1,7 +1,5 @@
 /**
- * @nerima-games/mc-dev-meta — the development-time workspace binder.
- *
- * PRE-AUDIT FIRST CUT (叩き台). See README.md 現状.
+ * @nerima-games/mc-dev-meta — the development-time workspace binder and portable kernel.
  *
  * plan.md §6 Step 0 item 2:
  *
@@ -11,11 +9,13 @@
  *   モノレポ同等のDX。**npm公開・バージョンbump運用は界面安定(4週間APIロック無変更)まで
  *   開始しない**
  *
- * This repository is PRIVATE and is never published. It depends on nothing —
- * not even `effect` — because it is the tool that fetches the packages and
- * therefore cannot be bootstrapped from them.
+ * This repository is PRIVATE and is never published. Its only runtime package
+ * dependency is `effect`, used by the portable kernel's branded values and
+ * service contracts. It must not depend on any managed `@nerima-games/*`
+ * package, because it is the tool that fetches those packages.
  *
- * Everything exported here is PURE. The parts that touch git and the
+ * The exported domain decisions and most portable Minecraft data/world primitives are
+ * pure. Effect service contracts remain explicit ports; the parts that touch git and the
  * filesystem live in `scripts/`, and they are thin shells over these decisions
  * so that the dangerous logic can be tested without a network or a temporary
  * directory. See docs/workflow.md.
@@ -31,11 +31,15 @@ export * from './domain/pin-plan'
 export * from './domain/repository-roster'
 export * from './domain/sync-plan'
 export * from './domain/workspace'
+export * from './domain/feature-audit'
+export * from './domain/feature-register'
+export * from './kernel'
+export * from './render/world-renderer'
+export * from './audio/audio-backend'
+export * from './multiplayer/websocket-transport'
 
-// NOT re-exported, deliberately: this barrel is the WORKSPACE BINDER's surface
-// (docs/public-api.md), and `domain/mirror-contract.ts` + `domain/type-shape.ts`
-// are the decision layer of a CHECK — `pnpm check:mirrors`. They are typechecked
-// by tsconfig.build.json and unit-tested like everything else in domain/; they
-// are simply not part of what this package would offer a consumer if it were
-// ever published.
-
+// The feature audit is re-exported because it is part of the public management
+// surface documented in docs/public-api.md. Mirror/type-shape modules remain
+// deliberately private to their checks: `domain/mirror-*.ts` +
+// `domain/type-shape.ts` are typechecked by tsconfig.build.json and unit-tested
+// like everything else in domain/, but are not part of this binder's API.

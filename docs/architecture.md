@@ -88,7 +88,7 @@ graph BT
 
 ## 3. このリポジトリの位置 ― グラフの外
 
-**mc-dev-meta は依存を持たず、誰からも依存されない。**
+**mc-dev-meta は管理対象リポジトリの依存グラフには参加せず、誰からも依存されない。**
 
 15 リポジトリすべてを管理するツールが、それらの依存グラフの参加者であってはならない。
 参加者だったら、ブートストラップに「自分が取ってくるためのパッケージ」が要ることになる。
@@ -96,7 +96,8 @@ graph BT
 そのため:
 
 - `dependsOn` は空
-- **`package.json` の `dependencies` が存在しない。** `effect` すら入っていない
+- **`package.json` の runtime dependency は `effect` だけである。** `src/kernel/` の branded
+  値と Effect service 契約に必要で、管理スクリプトから兄弟リポジトリを起動するための依存ではない
 - `pnpm-workspace.yaml` に自分自身を含めない(`packages: ['repos/*']` だけ)
 - `private: true`。publish されない
 
@@ -110,16 +111,25 @@ graph BT
 そこで `domain/repository-roster.ts` が**ロスターの参照コピー**を持つ。
 
 各リポジトリが `scripts/check-dependency-whitelist.ts` の中に、この依存グラフを
-手書きでミラーした写しを持つ方式は org 全体で廃止された。Tier 境界の検査は今、
-各リポジトリ自身の `.oxlintrc.json#no-restricted-imports` が担う(DEPENDENCY_POLICY.md) —
-つまり「グラフを手書きでミラーして、参照コピーとの一致を検査する」という設計そのものが
-このリポジトリの外では使われなくなった。
+手書きでミラーした写しを持つ方式は、新しい mc-dev-meta 側の重複実装にはしない。
+ただし、現在の `repos.json` が指す snapshot にはこのスクリプトと `pnpm check:deps` が残る。
+Tier 境界の検査は各リポジトリ自身の `.oxlintrc.json#no-restricted-imports` が担う
+(DEPENDENCY_POLICY.md)。
 
 `domain/repository-roster.ts` は mc-dev-meta 自身の `pnpm sync` / `pnpm update:manifest` /
 `pnpm check:workspace` / `pnpm check:mirrors` / `pnpm check:repoint` が読む内部の参照コピーとして
 残る。他の 15 リポジトリへ配布・consume させる計画([workflow.md](./workflow.md) §5.4 が
-記録していたもの)は、ミラー先だった `scripts/check-dependency-whitelist.ts` 自体が
-無くなったことで前提が変わっており、現時点では未定である。
+記録していたもの)は、現在の snapshot では各リポジトリが同スクリプトを保持しているため、
+mc-dev-meta 側で新たな配布元を作らず、`pnpm check:workspace` から `verify` を実行して
+観測する方針である。
+
+### 3.2 機能証拠監査もグラフ外に置く
+
+`pnpm check:features` は `repos/` の snapshot を読む観測用ゲートであり、ゲームの依存グラフへ
+runtime を追加する仕組みではない。`src/domain/feature-register.ts` は機能証拠の登録簿、
+`src/domain/feature-audit.ts` は純粋な判定層、`scripts/check-features.ts` はファイル I/O と
+終了コードだけを担当する。この境界により、未実装の証拠を報告しながら、nested repository の
+runtime をこの管理層へ重複移植しない。
 
 ## 4. 設計ルール(16 リポジトリ共通)
 
@@ -158,15 +168,17 @@ mc-dev-meta はこれに関与しない。
 
 ### 4.4 依存境界は CI で強制(plan.md §2.3-5)
 
-各リポジトリ own の `scripts/check-dependency-whitelist.ts`(`pnpm check:deps`)が
-違反を非ゼロ終了で検査する方式は org 全体で廃止された。今は各リポジトリの
-`.oxlintrc.json#no-restricted-imports` が Tier 境界を検査する(DEPENDENCY_POLICY.md)。
+現在の snapshot では、各リポジトリ own の `scripts/check-dependency-whitelist.ts`
+(`pnpm check:deps`)が違反を非ゼロ終了で検査する。各リポジトリの
+`.oxlintrc.json#no-restricted-imports` も Tier 境界を検査する(DEPENDENCY_POLICY.md)。
+mc-dev-meta はこのゲートを複製せず、`pnpm check:workspace` で兄弟リポジトリの `verify` を
+実行する。
 参照実装の `check-package-dag.ts` は警告を出して常に 0 で終了していた
 — 落ちないゲートはドキュメントであってゲートではない、という原則自体は変わらない。
 
-mc-dev-meta は依存グラフの外(層外)にあり、`@nerima-games/*` を 1 つも import しないため、
-`.oxlintrc.json` に Tier 境界の追加エントリを持たない。「何も import していないこと」は
-`test/workspace.test.ts` の `declares no runtime dependencies at all` が検査する。
+mc-dev-meta は管理対象リポジトリ依存グラフの外(層外)にあり、`@nerima-games/*` を 1 つも
+import しないため、`.oxlintrc.json` に Tier 境界の追加エントリを持たない。ルートの
+`test/workspace.test.ts` は `dependencies` が `{ effect: '^3.22.1' }` と一致することを検査する。
 
 ## 5. 参照実装との対比
 

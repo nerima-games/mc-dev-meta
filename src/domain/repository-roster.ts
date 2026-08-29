@@ -1,8 +1,6 @@
 /**
  * The 16-repository roster and its dependency graph — the REFERENCE COPY.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * Why this lives here
  * ---------------------------------------------------------------------------
@@ -177,12 +175,11 @@ export const REPOSITORIES: ReadonlyArray<RepositoryEntry> = [
     name: 'mc-compose',
     tier: 'composition',
     // mc-render is here because compose registers the frame's input,
-    // camera-mirror, chunk-sync, draw and post-fx stages. plan.md §2.1 gave
-    // mc-render no runtime dependant at all — its only edge came from
-    // mc-playground-kit, which is devDependency-only — so nothing could reach
-    // the renderer, and the shipped build had no input stage. Registering
-    // another module's stages is wiring, not a rule, so it does not breach
-    // compose's prime directive.
+    // camera-mirror, chunk-sync, draw and post-fx stages. In the managed-repo
+    // graph, its only edge came from mc-playground-kit, which is
+    // devDependency-only, so nothing could reach the renderer and the shipped
+    // build had no input stage. Registering another module's stages is wiring,
+    // not a rule, so it does not breach compose's prime directive.
     dependsOn: ['mc-render', 'mx-gameplay', 'mx-redstone', 'mx-ui', 'mx-multiplayer'],
     devDependsOn: [],
     responsibility: 'Layer マージ + stage 順序表(唯一の全順序)+ セッション + QA API + Modding 入口 + E2E',
@@ -249,7 +246,7 @@ export const buildOrder = (): ReadonlyArray<string> | undefined => {
         // one entry per REPOSITORY_NAMES member (see its definition above),
         // so `.get(name)` for any name drawn from REPOSITORY_NAMES is always
         // defined.
-        /* v8 ignore next */
+        /* v8 ignore next -- @preserve */
         [...(DEPENDENCY_GRAPH.get(name) ?? [])].every((dependency) => !remaining.has(dependency)),
     )
 
@@ -258,7 +255,7 @@ export const buildOrder = (): ReadonlyArray<string> | undefined => {
     // `buildOrder` takes no parameters, so there is no way to drive this arm
     // without a genuinely cyclic DEPENDENCY_GRAPH, which would itself be the
     // bug this branch exists to catch.
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (ready.length === 0) {
       return undefined
     }

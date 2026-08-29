@@ -2,8 +2,6 @@
  * `pnpm check:repoint` — actually perform the repoint every mirror header
  * promises, and compile it.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * The argument for the gate, the list of repoints, the rewrite rule and every
  * decision about what a diagnostic means live in `domain/repoint-plan.ts`,
  * which is pure and unit-tested against fixtures. This file is the shell: it
@@ -77,10 +75,9 @@
  * Why this is NOT in `pnpm verify`
  * ---------------------------------------------------------------------------
  *
- * `check:mirrors` IS in `verify`, and its header argues the case: it costs
- * nothing when there is nothing to check, and a gate outside `verify` runs on
- * the day somebody remembers it. Both halves of that argument apply here too,
- * and one of them is false in a way that decides it.
+ * `check:mirrors` is a separate gate too. Its input is the pinned composite,
+ * while this gate additionally creates temporary copies and runs downstream
+ * typechecks, so neither belongs in the local `pnpm verify` loop.
  *
  * This gate does not cost nothing. It copies three repositories and runs NINE
  * `tsc` invocations over them — a baseline and a repointed compile for every
@@ -101,7 +98,7 @@ import { execFile } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { describeProvenance } from '../src/domain/mirror-contract'
+import { describeProvenance } from '../src/domain/repository-provenance'
 import {
   classifyRepoint,
   describeRepointRun,
@@ -384,7 +381,7 @@ export const main = async (): Promise<number> => {
   if (unmatched.length > 0) {
     throw new RepointCheckError(
       `REPOINT_SPECS names ${unmatched.map(repointPath).join(', ')}, which MIRROR_SPECS in ` +
-        'domain/mirror-contract.ts does not carry. One of the two registries is wrong; a repoint ' +
+        'domain/mirror-registry.ts does not carry. One of the two registries is wrong; a repoint ' +
         'of a file the mirror gate does not compare is a claim nothing else is watching.',
     )
   }

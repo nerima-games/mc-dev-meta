@@ -1,8 +1,6 @@
 /**
  * `pnpm update:manifest` — pin every present repository to its current HEAD.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * What this is for
  * ---------------------------------------------------------------------------

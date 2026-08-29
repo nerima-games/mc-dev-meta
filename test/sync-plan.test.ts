@@ -218,8 +218,8 @@ describe('an unpinned entry is fetched but never checked out', () => {
 
   // REGRESSION: this branch used to answer `Fetch` from EVERY clean state,
   // including one it had just fetched, so the caller's convergence loop ran the
-  // fetch again on every round. With `repos.json` shipping 15 unpinned entries
-  // and a 3-round loop that was 45 network round-trips per `pnpm sync`.
+  // fetch again on every round. With an earlier manifest where all 15 entries
+  // were unpinned, a 3-round loop made 45 network round-trips per `pnpm sync`.
   it('asks for a fetch once per run and then says there is nothing to do', () => {
     expect(planSync(unpinned, present({ head: SHA_B, fetchedThisRun: false }))._tag).toBe('Fetch')
     expect(planSync(unpinned, present({ head: SHA_B, fetchedThisRun: true }))._tag).toBe('UpToDate')
@@ -598,11 +598,12 @@ describe('planning the whole manifest', () => {
     { name: 'mc-kernel', url: 'u1', ref: SHA_A },
     { name: 'mc-noise', url: 'u2', ref: SHA_B },
     { name: 'mc-save', url: 'u3', ref: UNPINNED },
+    { name: 'mc-ui', url: 'u4', ref: SHA_A },
   ]
 
   it('preserves manifest order so output is stable between runs', () => {
     const actions = planAll(entries, () => absent)
-    expect(actions.map((action) => action.name)).toStrictEqual(['mc-kernel', 'mc-noise', 'mc-save'])
+    expect(actions.map((action) => action.name)).toStrictEqual(['mc-kernel', 'mc-noise', 'mc-save', 'mc-ui'])
   })
 
   it('summarises a mixed run by category', () => {
@@ -610,6 +611,7 @@ describe('planning the whole manifest', () => {
       ['mc-kernel', absent],
       ['mc-noise', present({ head: SHA_B, dirty: true })],
       ['mc-save', present({ head: SHA_A })],
+      ['mc-ui', present({ head: SHA_B })],
     ])
 
     const summary = summarise(planAll(entries, (entry) => states.get(entry.name) ?? absent))
@@ -617,7 +619,7 @@ describe('planning the whole manifest', () => {
     expect(summary.cloned).toStrictEqual(['mc-kernel'])
     expect(summary.skippedDirty).toStrictEqual(['mc-noise'])
     expect(summary.fetched).toStrictEqual(['mc-save'])
-    expect(summary.checkedOut).toStrictEqual([])
+    expect(summary.checkedOut).toStrictEqual(['mc-ui'])
   })
 
   it('plans an empty manifest without complaint', () => {

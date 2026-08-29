@@ -35,11 +35,11 @@ const defaultCloneUrl: (repositoryName) => string
 const buildOrder: () => ReadonlyArray<string> | undefined   // undefined = 循環あり
 ```
 
-**これはロスターの参照コピーである。** 各リポジトリが `scripts/check-dependency-whitelist.ts`
-の中に手書きミラーを持つ方式は org 全体で廃止され、Tier 境界の検査は
-`.oxlintrc.json#no-restricted-imports` に移った([architecture.md](./architecture.md) §3.1、
-DEPENDENCY_POLICY.md)。したがって現時点でこのロスターを読みに来る「ゲートのコピー」は
-他リポジトリ側には存在しない — このモジュールは mc-dev-meta 自身の `pnpm sync` /
+**これはロスターの参照コピーである。** mc-dev-meta は各リポジトリの
+`scripts/check-dependency-whitelist.ts` を新たに複製しない。現在の `repos.json` が指す
+snapshot には同スクリプトと `pnpm check:deps` が残っており、Tier 境界の検査は
+`.oxlintrc.json#no-restricted-imports` と併用される([architecture.md](./architecture.md) §3.1、
+DEPENDENCY_POLICY.md)。このモジュールは mc-dev-meta 自身の `pnpm sync` /
 `pnpm update:manifest` / `pnpm check:workspace` / `pnpm check:mirrors` / `pnpm check:repoint`
 が読む、内部利用の参照コピーである。
 
@@ -81,8 +81,9 @@ const describeManifestError: (error) => string
 | ラウンドトリップはバイト一致 | `serialiseManifest(parseManifest(raw)) === raw` |
 
 `Parsed<A>` は `Either` の手作り版である。
-**mc-dev-meta は実行時依存を 1 つも持たない** — `effect` すら入れない
-— ので、`Either` を使えない。これは制約ではなく設計([responsibility.md](./responsibility.md) §4)。
+これは manifest parser が必要とする小さな成功／失敗データ契約を、`effect` の
+`Either` とは独立に保つためである。`effect` は `src/kernel/` の branded 値と service
+契約に使う意図的な runtime dependency であり、parser の表現を決める依存ではない。
 
 ## 3. 同期判断(`domain/sync-plan.ts`)― 中核
 
@@ -203,22 +204,35 @@ const describeWorkspaceRun: (plan, command) => ReadonlyArray<string>
 | `workspace:*` → pin 済みバージョンへの一括切り替え支援 | [versioning.md](./versioning.md) §3 |
 | 並列 sync | 逐次で十分。出力の可読性を優先している |
 
-### API ロック — 廃止済み(旧: 集約レポートが未実装だった機能)
+### API ロック — 移行中 snapshot の観測(旧: 集約レポートが未実装だった機能)
 
 このセクションはかつて、16 リポジトリすべてが持つ `api-lock.md` /
 `scripts/api-lock.ts` / `pnpm api:check` の「リポジトリ単位のゲートは実装済みだが、
 横断の集約レポートがまだ無い」という状態を記録していた。
 
-**その前提ごと廃止された。** `api-lock.md` という自動生成・自動検査の公開 API
-スナップショット機構は、org として撤去する決定がなされている(API_STANDARD.md §4)。
-`scripts/api-lock.ts` / `pnpm api:check` / `pnpm api:update` は全 16 リポジトリから、
-このリポジトリが持っていた横断ツール `scripts/check-api-lock-window.ts`
-(`pnpm check:api-window`、他 15 リポジトリの `api-lock.md` の鮮度を集計して報告していた)
-も同時に削除した。1.0.0 への昇格は、この節が記録していた「4 週間無変更」の自動計測ではなく、
-maintainer の裁量判断による([versioning.md](./versioning.md) §2、RELEASE_STANDARD.md §4)。
+**4 週間無変更を昇格条件にする自動計測は廃止方針になった。** ただし、現在の
+`repos.json` が指す snapshot には `api-lock.md`、`scripts/api-lock.ts`、
+`pnpm api:check` / `pnpm api:update` が残るリポジトリがある。mc-dev-meta が持っていた
+横断ツール `scripts/check-api-lock-window.ts`(`pnpm check:api-window`) は存在せず、
+1.0.0 への昇格は「4 週間無変更」の自動計測ではなく maintainer の裁量判断による
+([versioning.md](./versioning.md) §2、RELEASE_STANDARD.md §4)。
 
 破壊的変更の判定は今後も人間のレビューで行う(API_STANDARD.md §3)。このリポジトリの
-`pnpm check:mirrors`(`domain/mirror-contract.ts` の型の形の比較)は、ミラー元リポジトリが
+`pnpm check:mirrors`（`domain/mirror-registry.ts` の登録簿を使い、`domain/mirror-comparison.ts` が型の形を比較）は、ミラー元リポジトリが
 `api-lock.md` をまだコミットしている間だけ機能する副次的な用途であり続けるが、
 それは今後段階的に skip へ収束していく想定の、経過的な依存である
 ([README.md](../README.md)「`pnpm check:mirrors` — このリポジトリにしか置けない検査」§3)。
+
+## 6. 機能証拠監査(`domain/feature-audit.ts`, `domain/feature-register.ts`)
+
+この機能はゲーム runtime ではなく、同期済み `repos/` の限定された証拠を評価する管理 API である。
+
+- `FeatureSpec`: owner、必要ファイル、実装マーカー、gap マーカーを持つデータ契約
+- `FEATURE_SPECS`: 現在監査する仕様の登録簿。網羅性を表す宣言ではない
+- `assessFeature` / `assessFeatures`: source 内容を `complete` / `partial` / `missing` / `unverified` に分類する純粋関数
+- `summarizeFeatureAssessments`: 状態別集計
+- `featureAuditExitCode`: 全件 complete のときだけ 0。CLI は snapshot の I/O と表示を担当する
+
+`pnpm check:features` はルートの統合ソースへ登録簿を適用する。`partial` / `missing` が
+あれば非ゼロを返すが、この結果はブラウザ操作、E2E、全公式機能、別リポジトリの
+runtime 移植を証明しない。

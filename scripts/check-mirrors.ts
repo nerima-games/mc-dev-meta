@@ -2,11 +2,10 @@
  * `pnpm check:mirrors` — compare every hand-written cross-repository mirror
  * against the repository it mirrors.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * The argument for the check, the list of mirrors, and every comparison rule
- * live in `domain/mirror-contract.ts`, which is pure and unit-tested against
- * fixtures. This file is the shell: it decides which repositories are on disk,
+ * live in the mirror model, comparison, run, and registry modules, which are
+ * pure and unit-tested against fixtures. This file is the shell: it decides
+ * which repositories are on disk,
  * imports the modules, runs the refinements, reads the lock files, and turns
  * the resulting plain data over to the domain.
  *
@@ -50,7 +49,7 @@
  *   - the mirroring repository is not cloned;
  *   - the mirror file is gone (which is what SUCCESS looks like eventually:
  *     the source got published and the mirror was deleted — the message says to
- *     drop the row from MIRROR_SPECS);
+ *     drop the row from MIRROR_SPECS in `domain/mirror-registry.ts`);
  *   - the source repository is not cloned, or has no committed api-lock.md;
  *   - a module cannot be imported because a PACKAGE is not installed.
  *
@@ -62,21 +61,19 @@
  *   - and of course an actual disagreement.
  *
  * ---------------------------------------------------------------------------
- * Why this runs in `pnpm verify`
+ * Why this is a separate gate from `pnpm verify`
  * ---------------------------------------------------------------------------
  *
- * Because it costs nothing when there is nothing to check, and because a check
- * that is not in `verify` is a check that runs on the day someone remembers to
- * run it — which is never the day the drift is introduced. `pnpm api:check` is
- * in `verify` for exactly this reason and this is its cross-repository sibling.
+ * `pnpm verify` protects this repository's own source with typechecking, lint,
+ * and tests. This gate is separate because its input is the pinned composite
+ * under `repos/`, which is populated by `pnpm sync` and is absent in a fresh
+ * clone. It is therefore an explicit cross-repository check rather than part
+ * of the local verification loop.
  *
- * The counter-argument is real and worth stating: this is the only member of
- * `verify` whose result depends on files outside the repository, so `verify`
- * can now pass on one machine and fail on another with the same commit. That is
- * true, and it is the point. The composite state is pinned in `repos.json`; a
- * disagreement between two pinned revisions IS a property of this commit of
- * mc-dev-meta, and it is not a property of any other repository's commit,
- * because no other repository can see both.
+ * The composite state is pinned in `repos.json`; a disagreement between two
+ * pinned revisions is a property of this commit of mc-dev-meta, and it is not
+ * a property of any other repository's commit, because no other repository can
+ * see both.
  *
  * ---------------------------------------------------------------------------
  * Which checkout, and why the report has to say so
@@ -93,31 +90,29 @@
  * The loop is fixed elsewhere. What is fixed HERE is the half that would have
  * made it cheap: every run now prints the revisions it read and flags the ones
  * that are not the pin, and the failure block names the checkout. See
- * `MIRROR_SOURCE_NOTE` in domain/mirror-contract.ts for why the split with
+ * `MIRROR_SOURCE_NOTE` in domain/repository-provenance.ts for why the split with
  * mc-compose's `pnpm check:roster` is deliberate rather than accidental.
  */
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import {
-  compareMirror,
-  describeMirrorRun,
-  describeProvenance,
-  fingerprintFinding,
-  mirrorPath,
-  mirrorRunExitCode,
-  MIRROR_SPECS,
-  REFINEMENT_SAMPLES,
-  type CapabilityObservation,
-  type MirrorObservation,
-  type MirrorOutcome,
-  type MirrorSpec,
-  type PropertyObservation,
-  type SampleVerdict,
-  type SourceObservation,
-  type TranscribedColumn,
-  type ValueObservation,
-} from '../src/domain/mirror-contract'
+import { compareMirror, describeMirrorRun, mirrorRunExitCode } from '../src/domain/mirror-run'
+import type { MirrorOutcome } from '../src/domain/mirror-run'
+import { fingerprintFinding } from '../src/domain/mirror-registers'
+import { REFINEMENT_SAMPLES } from '../src/domain/mirror-model'
+import type {
+  CapabilityObservation,
+  MirrorObservation,
+  MirrorSpec,
+  PropertyObservation,
+  SampleVerdict,
+  SourceObservation,
+  TranscribedColumn,
+  ValueObservation,
+} from '../src/domain/mirror-model'
+import { mirrorPath } from '../src/domain/mirror-path'
+import { MIRROR_SPECS } from '../src/domain/mirror-registry'
+import { describeProvenance } from '../src/domain/repository-provenance'
 import { loadManifest, provenanceOf } from './repos-provenance'
 import { REPOS_DIRECTORY } from '../src/domain/workspace'
 import {
@@ -537,7 +532,7 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
     return skip(
       spec,
       `${spec.file} no longer exists. If ${spec.source} was published and the mirror deleted, ` +
-        'delete its row from MIRROR_SPECS in domain/mirror-contract.ts too.',
+        'delete its row from MIRROR_SPECS in domain/mirror-registry.ts too.',
     )
   }
 

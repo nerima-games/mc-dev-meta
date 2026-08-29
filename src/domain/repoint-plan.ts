@@ -1,14 +1,13 @@
 /**
  * Cross-repository repoint verification: the decision half. PURE — no
- * filesystem, no child process, no dependencies.
- *
- * PRE-AUDIT FIRST CUT (叩き台).
+ * filesystem, no child process, or network I/O. Package dependencies are not
+ * consulted by this decision layer.
  *
  * ---------------------------------------------------------------------------
  * What this adds to `pnpm check:mirrors`, and why that gate is not enough
  * ---------------------------------------------------------------------------
  *
- * `domain/mirror-contract.ts` compares a mirror against its source and is the
+ * `domain/mirror-comparison.ts` compares a mirror against its source and is the
  * stronger gate of the two for the defects it hunts: it RUNS both modules, so a
  * block id, a brand's refinement and a `Context.Tag`'s key are compared as
  * values rather than as text. Nothing here replaces any of that.
@@ -83,7 +82,8 @@
  * typecheck against each other and disagree about what a function means.
  */
 
-import { type MirrorSpec, MIRROR_SPECS } from './mirror-contract'
+import { MIRROR_SPECS } from './mirror-registry'
+import type { MirrorSpec } from './mirror-model'
 
 // ---------------------------------------------------------------------------
 // The registry: which mirror gets repointed at which package
@@ -308,7 +308,8 @@ export type RewriteResult = {
  * in the same word.
  *
  * KNOWN LIMIT, and it is a deliberate trade. This is a regex over text, not a
- * parse, because the gate must have no dependencies of its own. A DOC COMMENT
+ * parse, because the gate must remain a small text decision without a parser
+ * dependency. A DOC COMMENT
  * containing the exact bytes `from './frame-contract'` would be rewritten too.
  * That is harmless — a comment does not compile — and the alternative is
  * carrying a TypeScript parser to protect prose. Comments referring to the
@@ -420,7 +421,7 @@ export const parseDiagnostics = (output: string): ReadonlyArray<Diagnostic> =>
       // all five. TypeScript's `RegExpExecArray` typing does not encode that
       // a group is unconditional, hence the check — but no input can drive
       // this arm without DIAGNOSTIC_LINE itself gaining an optional group.
-      /* v8 ignore next 9 */
+      /* v8 ignore next 9 -- @preserve */
       if (
         file === undefined ||
         line === undefined ||
@@ -446,7 +447,7 @@ export const parseDiagnostics = (output: string): ReadonlyArray<Diagnostic> =>
  * for matching `KNOWN_REPOINT_FINDINGS`.
  *
  * LINE AND COLUMN ARE DELIBERATELY EXCLUDED. `fingerprintFinding` in
- * `domain/mirror-contract.ts` includes every discriminating field because its
+ * `domain/mirror-registers.ts` includes every discriminating field because its
  * findings are structural and a mirror's shape does not move when somebody adds
  * a blank line. A tsc diagnostic's position does: any edit above it shifts
  * every line number below, and a register keyed on position would go stale on
@@ -475,7 +476,7 @@ export const fingerprintDiagnostic = (
  * does not own.
  *
  * Same instrument, same argument and same discipline as `KNOWN_FINDINGS` in
- * `domain/mirror-contract.ts`, and the reasoning is not repeated here beyond
+ * `domain/mirror-registers.ts`, and the reasoning is not repeated here beyond
  * the one line that matters: recording the defect is strictly better than not
  * running the gate until it is fixed, and strictly better than failing
  * mc-dev-meta's own `verify` for something only another repository's pull
@@ -747,7 +748,7 @@ export const repointRunExitCode = (
  * message did not name the checkout it had read made a stale pin read as real
  * drift and cost a diagnosis (docs/manifest.md §5). This gate reads the same
  * `repos/` and prints the same provenance block — `describeProvenance` from
- * `domain/mirror-contract.ts`, reused rather than restated, because two
+ * `domain/repository-provenance.ts`, reused rather than restated, because two
  * hand-written copies of a provenance report is the joke this repository exists
  * to stop telling.
  *

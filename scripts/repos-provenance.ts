@@ -2,12 +2,10 @@
  * What was under `repos/` when a cross-repository gate ran, and whether it was
  * the revision `repos.json` pins.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * Extracted from `scripts/check-mirrors.ts` when `scripts/check-repoint.ts`
  * needed the same answer. It is the impure half only — the git calls and the
  * manifest read. The DECISION about what the answer means (`isOffPin`,
- * `describeProvenance`) was already shared, in `domain/mirror-contract.ts`.
+ * `describeProvenance`) was already shared, in `domain/repository-provenance.ts`.
  *
  * Two gates that read the pinned composite must report it identically, and the
  * alternative — a second hand-written copy of a provenance reader — is the
@@ -27,7 +25,7 @@ import {
   parseManifest,
   type Manifest,
 } from '../src/domain/manifest'
-import type { RepositoryProvenance } from '../src/domain/mirror-contract'
+import type { RepositoryProvenance } from '../src/domain/repository-provenance'
 import { isDestructiveGitCommand } from '../src/domain/sync-plan'
 import { MANIFEST_FILENAME, REPOS_DIRECTORY } from '../src/domain/workspace'
 
