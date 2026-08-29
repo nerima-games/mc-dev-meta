@@ -4,33 +4,34 @@
 
 | レイヤ | 検証手段 | 現状 |
 | --- | --- | --- |
-| **同期判断**(最重要) | 全状態 × 全エントリの網羅 + 破壊的コマンドの不在 + 冪等性 | `test/sync-plan.test.ts`(52 tests) |
-| マニフェスト | パース・検証・pin・シリアライズ + **コミット済み repos.json** | `test/manifest.test.ts`(43 tests) |
-| ピン計画 | pin / unpinned・remote 観測からの決定 | `test/pin-plan.test.ts`(19 tests) |
-| ロスター | 16 件・階層・グラフ | `test/roster.test.ts`(14 tests) |
-| ワークスペース実行 | **空の repos/** ・部分・完全・未管理ディレクトリ | `test/workspace.test.ts`(20 tests) |
-| 張り替え計画 | 診断のフィンガープリント・baseline との差分・known findings | `test/repoint-plan.test.ts`(48 tests) |
-| **ミラー突合**(横断) | 一致・定数 drift・タグキー drift・brand の refinement drift・union の arm 欠落・**能力フラグ drift・プロパティ列 drift**・未 clone の skip | `test/mirror-contract.test.ts`(70 tests) |
-| 型の形の読み取り | 手書き union と tsc の union の**両方の綴り**・コメント/文字列の除去・`api-lock.md` | `test/type-shape.test.ts`(22 tests) |
+| **同期判断**(最重要) | 全状態 × 全エントリの網羅 + 破壊的コマンドの不在 + 冪等性 | `test/sync-plan.test.ts` |
+| マニフェスト | パース・検証・pin・シリアライズ + **コミット済み repos.json** | `test/manifest.test.ts` |
+| ピン計画 | pin / unpinned・remote 観測からの決定 | `test/pin-plan.test.ts` |
+| ロスター | 16 件・階層・グラフ | `test/repository-roster.test.ts` |
+| ワークスペース実行 | **空の repos/** ・部分・完全・未管理ディレクトリ | `test/workspace.test.ts` |
+| 張り替え計画 | 診断のフィンガープリント・baseline との差分・known findings | `test/repoint-plan.test.ts` |
+| **ミラー突合**(横断) | 一致・定数 drift・タグキー drift・brand の refinement drift・union の arm 欠落・**能力フラグ drift・プロパティ列 drift**・未 clone の skip | `test/mirror-contract.test.ts` |
+| 型の形の読み取り | 手書き union と tsc の union の**両方の綴り**・コメント/文字列の除去・`api-lock.md` | `test/type-shape.test.ts` |
 | `scripts/` の I/O | **検証しない**(§4) | — |
 
-現在 **288 tests / 8 files**、`pnpm test` で 2 秒前後。
+テスト件数は追加・分割で変動するため固定値を文書化しない。`pnpm test` の実行時出力で、
+選択されたファイル数とテスト数を確認する。
 
-**依存境界(ホワイトリスト・循環検査・`Date.now()` 禁止)を検査していた
-`test/check-dependency-whitelist.test.ts` と、それが検査していた
-`scripts/check-dependency-whitelist.ts` は org 全体で廃止された**
-(DEPENDENCY_POLICY.md、`pnpm check:deps` の撤去)。Tier 境界の検査は各リポジトリの
-`.oxlintrc.json#no-restricted-imports` に移り、mc-dev-meta は層外でこのルールに
-追加エントリを持たないため対応するテストも持たない。
+**依存境界(ホワイトリスト・循環検査・`Date.now()` 禁止)を検査する
+`test/check-dependency-whitelist.test.ts` と `scripts/check-dependency-whitelist.ts` は、
+mc-dev-meta 自身には置かない。** 現在の `repos.json` が指す snapshot には兄弟リポジトリ側の
+`scripts/check-dependency-whitelist.ts` と `pnpm check:deps` が残っており、Tier 境界は
+`.oxlintrc.json#no-restricted-imports` と併用される。mc-dev-meta は層外で追加エントリを
+持たないため、対応するルートテストも持たない。
 
 ## 2. プレーン vitest を使う
 
 他の 15 リポジトリは `@effect/vitest` の `it.effect` を主 API とするが、
 **mc-dev-meta はプレーン vitest を使う**。
 
-理由は依存である。**このリポジトリは実行時依存を 1 つも持たない**
-— `effect` すら入れない。15 リポジトリを取ってくるツールが
-それらからブートストラップされてはならないからである
+理由は境界である。`src/kernel/` は `effect` の公開契約を使うが、テストは
+`@effect/vitest` や `it.effect` に依存せず、純粋関数・データ契約をプレーンな assertion で
+検証する。15 リポジトリを取ってくる管理スクリプトを runtime 実装から分離するためである
 ([responsibility.md](./responsibility.md) §4)。
 
 同期的なアサーションを Effect で包んでも何も得られないので、素の `it` で書く。
@@ -65,6 +66,11 @@ const EVERY_STATE: ReadonlyArray<WorkingCopyState> = [
   ...EVERY_OBSERVED_STATE.flatMap((state) => [state, { ...state, fetchedThisRun: true }]),
 ]
 ```
+
+同期済み snapshot での直近の実測は、workspace が 14 passed / 1 failed
+（mc-compose の worktree パス依存テスト）、ミラー突合が 15/15 比較・11/11 revision
+である。workspace の既知差分はこのリポジトリの責務外なので、
+[step2-status.md](./step2-status.md) に記録し、ネストしたリポジトリは変更しない。
 
 そして `EVERY_STATE × EVERY_ENTRY`(pinned / unpinned)で:
 
@@ -143,15 +149,15 @@ if (!status.ok || !head.ok) {
 | `gitignores repos/` | 15 リポジトリを 16 個目にベンダリングする事故 |
 | `does not list itself as a workspace package` | 自己ブートストラップの循環 |
 | `is marked private, so it can never be published by accident` | 誤 publish |
-| `declares no runtime dependencies at all` | 依存ゼロという設計の維持 |
+| `declares the intentional runtime dependency set` | `effect` 以外の runtime dependency を無断で増やさない |
+| **機能証拠監査** | `feature-register.ts` の限定仕様と snapshot の証拠を突合 | `test/feature-audit.test.ts` |
 
 **これらが落ちたときは、実装ではなく設計判断が変わったということである。**
 
-かつてここには `the roster and the dependency gate agree` という行があり、
-`domain/repository-roster.ts`(参照コピー)と `scripts/check-dependency-whitelist.ts`
-(このリポジトリ自身のゲートコピー)が辺単位で一致することを検証していた。
-その後者が org 全体で廃止されたため、比較対象自体が無くなり、このテストは削除した
-(§1 参照)。
+かつてここには `the roster and the dependency gate agree` という行を置く案があり、
+`domain/repository-roster.ts`(参照コピー)と依存ゲートの写しを辺単位で一致させることを
+検討していた。mc-dev-meta はそのゲートを複製しないため、現在のルートテストはこの比較を
+行わず、`pnpm check:workspace` が各 snapshot の `verify` を実行する(§1 参照)。
 
 ## 6. 空の `repos/` で `pnpm verify` が通ること
 
@@ -161,29 +167,43 @@ if (!status.ok || !head.ok) {
 CI は `repos/` が空の状態で回る。そこで:
 
 ```console
-$ pnpm verify          # typecheck && lint && test(TEST_STANDARD.md §1)
+$ pnpm verify          # typecheck && lint && test:coverage(TEST_STANDARD.md §1)
 $ pnpm check:workspace # exit 0、「空です」と言う
-$ pnpm check:mirrors   # exit 0、「比較できたミラーは 0/15」と言う。CI では verify とは別ステップ
+$ pnpm check:mirrors   # repos/ が空なら exit 0。CI では verify とは別ステップ
+$ pnpm check:features  # ルートの統合ソースを監査。complete 以外を非ゼロで報告
 ```
 
 もし `pnpm verify` が 15 リポジトリの存在を要求したら、
 **15 リポジトリを取ってくるツールが、最後に信用できるようになるもの**になってしまう。
 
-`pnpm check:mirrors` は `verify` の中で唯一、結果が**リポジトリ外のファイルに依存する**。
+`pnpm check:mirrors` は `verify` とは別に実行する、結果が**リポジトリ外のファイルに依存する**ゲートである。
 同じコミットが、あるマシンでは通り別のマシンでは落ちうる — それは事実であり、そこが要点である。
 合成状態は `repos.json` で pin されており、pin された 2 リビジョンの食い違いは
 **mc-dev-meta のこのコミットの性質**であって、他のどのリポジトリのコミットの性質でもない。
 両方を同時に見られるのがここだけだからである。
+
+### 6.0.2 `pnpm check:features` — 機能証拠の観測ゲート
+
+`check:features` は、`src/domain/feature-register.ts` に登録された機能仕様について、
+各 snapshot の指定パスに実装マーカーと未実装・保留マーカーが存在するかを調べる。
+仕様はデータ、判定は `src/domain/feature-audit.ts` の純粋関数、ファイル読み取りと終了コードは
+`scripts/check-features.ts` が担当する。
+
+この監査の `complete` は登録された証拠が揃ったことだけを意味する。登録簿にない公式機能、
+ブラウザ操作、実ゲームの受け入れシナリオ、別リポジトリの runtime 移植までは証明しない。
+そのため `partial` / `missing` は成功扱いにせず非ゼロで返す。新しい未完了条件を見つけたときは、
+README の手書き集計だけを更新せず、
+仕様・純粋判定・テストを同時に追加する。
 
 ### 空でない場合に何が skip され、何が落ちるか
 
 | 状況 | 結果 |
 | --- | --- |
 | ミラー元 / ミラー側リポジトリが clone されていない | skip(理由を印字) |
-| ミラーファイルが消えている(= publish 後に削除された) | skip + 「`MIRROR_SPECS` の行も消せ」 |
+| ミラーファイルが消えている(= publish 後に削除された) | skip + 「`MIRROR_SPECS` の行（`domain/mirror-registry.ts`）も消せ」 |
 | clone 済みだが `pnpm install` されていない | skip(理由を印字) |
 | import はできたが値も型も 0 件だった | **落ちる**(比較対象ゼロは「一致」ではない) |
-| `MIRROR_SPECS` が実在しない export を probe している | **落ちる**(古い spec が黙って no-op になるのを防ぐ) |
+| `MIRROR_SPECS`（`domain/mirror-registry.ts`）が実在しない export を probe している | **落ちる**(古い spec が黙って no-op になるのを防ぐ) |
 | プロパティ probe が id を 1 件も読まなかった | **落ちる**(0 件の比較は「一致」ではない) |
 | `KNOWN_FINDINGS` にある既知欠陥 | 落ちない。ただし毎回全文を印字する |
 | 新しい差分 / 既知欠陥が直ったのにエントリが残っている | **落ちる** |
@@ -269,8 +289,7 @@ baseline に無い診断だけが張り替えのせいにされる。
 
 ### なぜ `verify` に入れないのか
 
-`check:mirrors` は `verify` に**入っている**(§6)。その理由の半分はここにも当てはまるが、
-半分は当てはまらない。**このゲートはタダではない。**
+`check:repoint` は `verify` に**入っていない**(§6.1)。**このゲートはタダではない。**
 3 リポジトリをコピーして、それぞれの `typecheck` が名指す project ごとに
 baseline と張り替え後の 2 回、合計 9 回 `tsc` を回す(実測 13 秒)。
 `verify` はコミットのたびに回すものであり、
@@ -307,30 +326,16 @@ CI・定期実行・publish 前には回す。
 
 ## 7. カバレッジ
 
-計測は常に動いている(`pnpm test:coverage`)。対象は `src/index.ts` と `src/domain/**`
-のみで、`scripts/**` と `repos/**` は除外している(§4)。
+計測は `pnpm test:coverage` で実行し、`pnpm verify` からも実行する。対象は
+`src/index.ts` と `src/domain/**` のみで、`scripts/**` と `repos/**` は除外している(§4)。
 
-**4 指標 99% の閾値ゲートは有効。** TEST_STANDARD.md §3 の org 決定により、
-段階移行や個別リポジトリの猶予なしで全 16 リポジトリに適用された。移行時点の実測:
-
-| 指標 | 実測 | 99% 判定 |
-| --- | --- | --- |
-| statements | 93.78% | 未達 |
-| branches | 89.19% | 未達 |
-| functions | 97.82% | 未達 |
-| lines | 93.78% | 未達 |
-
-4 指標とも未達であり、**このゲートを有効にした時点で CI は赤くなる**。これは
-TEST_STANDARD.md §4 が mc-audio / mc-compose / mc-playground-kit について明言している
-のと同じ扱いで、しきい値を緩める理由にはしない。`src/index.ts` は再エクスポートのみの
-バレルで、どのテストも `src/index.ts` 経由では import していないため 0% と報告される
-— `src/domain/*` を直接 import する現在のテストの書き方(§2)の帰結であり、
-バレル経由の import を検証するテストを足すか、既知の空白として記録するかは今後の課題。
+**4 指標 100% の閾値ゲートは有効。** statements / branches / functions / lines
+のすべてで100%を要求し、現在の実測でも4指標すべてが100%である。型で到達不能な
+`assertUnreachable` は、実在しない値を捏造するテストで埋めず、設定上の除外として明記している。
 
 ## 8. まだ書いていないテスト
 
 | テスト | 前提 |
 | --- | --- |
-| `src/index.ts` バレル経由の re-export を実際に import して検証する | §7 のカバレッジ空白を埋める |
-| プロパティテスト(任意の状態列で `settle` が収束する) | fast-check を devDependency に足すかどうか。依存ゼロ方針との兼ね合い |
+| プロパティテスト(任意の状態列で `settle` が収束する) | fast-check を devDependency に足すかどうか。実行時間と保守コストを測って判断 |
 | `update:manifest` の統合テスト | 実 git が要る。**書かない**方針(§4) |

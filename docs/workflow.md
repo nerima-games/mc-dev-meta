@@ -44,7 +44,7 @@ $ find . -path ./node_modules -prune -o -name '*.ts' -not -name '*.test.ts' -pri
 ```console
 $ git clone https://github.com/nerima-games/mc-dev-meta.git
 $ cd mc-dev-meta
-$ direnv allow          # flake.nix の devShell で nodejs_22 + corepack + oxlint が入る
+$ direnv allow          # flake.nix の devShell で nodejs_24 + corepack + oxlint が入る
 $ pnpm install          # このリポジトリ自身の devDependencies(oxlint は含まない。上記 devShell 由来)
 $ pnpm sync             # 15 リポジトリを repos/ へ clone
 $ pnpm install          # ここで repos/* が workspace として解決される
@@ -229,11 +229,11 @@ mc-kernel の 1 行変更が 15 リポジトリの bump 連鎖を引き起こす
 > 界面が安定した(**API ロック 4 週間無変更**)リポジトリから GitHub Packages 等へ npm 公開 +
 > changesets 運用に切り替え。それまでは dev-meta workspace 統合で開発
 
-**この「4 週間 API ロック無変更」という日数計測ベースの自動条件は org 全体で廃止された**
-(RELEASE_STANDARD.md §4.1)。`api-lock.md` / `pnpm api:check` / `pnpm api:update` は
-全 16 リポジトリから撤去され、このリポジトリが横断で鮮度を計測していた
-`scripts/check-api-lock-window.ts`(`pnpm check:api-window`)も、計測対象が無くなったため
-同時に削除した。
+**この「4 週間 API ロック無変更」という日数計測ベースの自動条件は、昇格条件から外す方針に
+なった**(RELEASE_STANDARD.md §4.1)。ただし、現在の `repos.json` が指す snapshot には
+`api-lock.md` / `pnpm api:check` / `pnpm api:update` が残るリポジトリがある。このリポジトリが
+横断で鮮度を計測していた `scripts/check-api-lock-window.ts`(`pnpm check:api-window`) は存在せず、
+残存するロックを自動の昇格条件には使わない。
 
 **代わりに、1.0.0 への昇格は maintainer(take)の裁量判断による**
 (RELEASE_STANDARD.md §4.2、[versioning.md](./versioning.md) §2.1)。実質的なトリガーは
@@ -287,7 +287,7 @@ publish が始まっても要る。ただし役割は変わる:
 | `repos/` をコミットする | 15 リポジトリを 16 個目にベンダリングすることになり、分割の意味が消える |
 | `pnpm-lock.yaml` を commit する(gitignore を外す) | 中身が `repos/` の有無で変わるので、どちらを commit しても恒久的に dirty になる。§2.1 |
 | mc-dev-meta を workspace メンバーにする(`packages: ['.']`) | 自分が取ってくるパッケージから自分をブートストラップすることになる |
-| mc-dev-meta に依存を足す | 同上。**依存はゼロ**であり、`effect` すら入れない |
+| mc-dev-meta に管理対象リポジトリを runtime dependency として足す | 同上。`effect` は kernel の branded 値と service 契約のために許可された唯一の runtime dependency |
 | `repos/` の中で `git reset --hard` を打つ | このツールがやらないことを手でやることになる。やるなら意識してやること |
 | `pnpm update:manifest` せずに「動いた」と言う | 合成状態が記録されていないので、その主張は再現できない |
 | pin を打たずに長期間放置する | `pnpm check:workspace` が毎回警告する。警告が出続けている状態を常態にしない |

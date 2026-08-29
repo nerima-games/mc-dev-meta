@@ -198,6 +198,16 @@ describe('reading a plain object type', () => {
     expect(memberNames(shapeOf(text, 'GameModule'))).toStrictEqual(['frameStages', 'layers'])
   })
 
+  it('handles nested angle brackets in a generic parameter default', () => {
+    const text = [
+      'export interface Nested<Outer = Map<string, Array<number>>> {',
+      '  readonly value: Outer',
+      '}',
+    ].join('\n')
+
+    expect(memberNames(shapeOf(text, 'Nested'))).toStrictEqual(['value'])
+  })
+
   // REGRESSION: a generic parameter's default can itself be a function type,
   // whose `=>` must not be read as closing the parameter list on its `>`.
   it('is not confused by an arrow function type inside a generic default', () => {
@@ -271,7 +281,7 @@ describe('declarations that are not object types', () => {
   // members, and DROPPING it from the result would mean a mirror that declared
   // `type Foo = SomeAlias` where the source declares an object type was
   // compared against nothing and reported as agreeing. It is kept, with no
-  // arms, so that domain/mirror-contract.ts can say so.
+  // arms, so that domain/mirror-comparison.ts can say so.
   it('keeps a brand, with no arms', () => {
     const shape = shapeOf("export type DeltaTimeSecs = number & Brand.Brand<'DeltaTimeSecs'>\n", 'DeltaTimeSecs')
 

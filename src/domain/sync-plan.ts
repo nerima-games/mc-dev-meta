@@ -1,8 +1,6 @@
 /**
  * The sync decision. PURE — no filesystem, no git, no network.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * The one rule
  * ---------------------------------------------------------------------------
@@ -386,7 +384,7 @@ export const applyAction = (
     // Structurally unreachable: every SyncAction tag is handled above, so
     // TypeScript only accepts this call because `action` has narrowed to
     // `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       return assertUnreachable(action)
   }
@@ -537,7 +535,7 @@ export const gitCommandsFor = (
     // Structurally unreachable: every SyncAction tag is handled above, so
     // TypeScript only accepts this call because `action` has narrowed to
     // `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       return assertUnreachable(action)
   }
@@ -556,7 +554,7 @@ const describeFetchReason = (reason: FetchReason): string => {
     // Structurally unreachable: every FetchReason is handled above, so
     // TypeScript only accepts this call because `reason` has narrowed to
     // `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       return assertUnreachable(reason)
   }
@@ -589,7 +587,7 @@ export const describeAction = (action: SyncAction): string => {
     // Structurally unreachable: every SyncAction tag is handled above, so
     // TypeScript only accepts this call because `action` has narrowed to
     // `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       return assertUnreachable(action)
   }

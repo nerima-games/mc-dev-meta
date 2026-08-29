@@ -218,11 +218,11 @@ describe('the committed workspace configuration', () => {
     expect(manifest.publishConfig).toBeUndefined()
   })
 
-  // REGRESSION: mc-dev-meta has NO runtime dependencies, deliberately. It is
-  // the tool that fetches the packages and cannot be bootstrapped from them.
-  it('declares no runtime dependencies at all', () => {
-    const manifest = JSON.parse(readRoot('package.json')) as { readonly dependencies?: unknown }
-    expect(manifest.dependencies).toBeUndefined()
+  it('declares only the portable kernel runtime contract dependency', () => {
+    const manifest = JSON.parse(readRoot('package.json')) as {
+      readonly dependencies?: Record<string, string>
+    }
+    expect(manifest.dependencies).toStrictEqual({ effect: '^3.22.1' })
   })
 
   it('manages exactly the repositories the roster says it manages', () => {

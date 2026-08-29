@@ -6,7 +6,8 @@
  * 0% coverage even though every symbol it re-exports is otherwise fully
  * tested. This file's only job is to prove the barrel itself — the surface a
  * consumer would actually import — wires each re-export through correctly,
- * by calling one real function from each of the five re-exported modules
+ * by calling one real function from each of the management modules and the
+ * portable kernel barrel
  * THROUGH THE BARREL and checking a real result.
  */
 import { describe, expect, it } from 'vitest'
@@ -15,6 +16,8 @@ import {
   describePinDecision,
   MANAGED_REPOSITORY_NAMES,
   MANIFEST_VERSION,
+  blockCount,
+  createChunkBounds,
   packageNameOf,
   parseManifest,
   planWorkspaceRun,
@@ -56,5 +59,10 @@ describe('the public API barrel', () => {
     const plan = planWorkspaceRun(manifest, ['mc-kernel'])
     expect(plan.status).toBe('complete')
     expect(plan.targets.map((entry) => entry.name)).toStrictEqual(['mc-kernel'])
+  })
+
+  it('re-exports the portable kernel', () => {
+    expect(blockCount()).toBe(120)
+    expect(createChunkBounds(-64, 320)).toStrictEqual({ minY: -64, maxYExclusive: 320 })
   })
 })

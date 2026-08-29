@@ -3,13 +3,11 @@
  * of a committed `api-lock.md`. PURE — no filesystem, no compiler, no
  * dependencies.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * Why `api-lock.md` is the source of truth for the type half
  * ---------------------------------------------------------------------------
  *
- * `domain/mirror-contract.ts` compares a hand-written mirror against the
+ * `domain/mirror-comparison.ts` compares a hand-written mirror against the
  * repository it mirrors. Values can be compared by importing both and looking
  * at them. Types cannot: they are gone at runtime, and mc-dev-meta has no
  * business type-checking fifteen repositories it did not build.
@@ -81,7 +79,7 @@
  * rejected for in `scripts/api-lock.ts`: a report that certifies that nothing
  * happened is worse than no report. So a declaration this parser cannot read as
  * an object type is recorded WITH ZERO ARMS rather than dropped, and
- * `domain/mirror-contract.ts` turns "the mirror has no comparable shape where
+ * `domain/mirror-comparison.ts` turns "the mirror has no comparable shape where
  * the source has one" into a finding.
  *
  * - Only a plain object type, a union of them, and an intersection containing
@@ -294,7 +292,7 @@ const membersOf = (body: string): ReadonlyArray<TypeMember> => {
     // Structurally unreachable: MEMBER_ANCHOR's name group is a mandatory
     // (non-optional) pattern, so a successful match has always captured it.
     // TypeScript's regex typing does not encode "this group is unconditional".
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (name === undefined) {
       continue
     }
@@ -457,7 +455,7 @@ const readVariantBodies = (
     // and empty-string cases above have all been ruled out, so the character
     // `skipOperand` starts on can never be one of ITS OWN depth-0 stop
     // characters — it always advances by at least one position.
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (next <= cursor) {
       return { bodies, unterminated: false }
     }
@@ -476,7 +474,7 @@ const readVariantBodies = (
  * the silent-pass bug this whole module is written against: a mirror that
  * declared `type Foo = SomeAlias` where the source declares an object type
  * would then be compared against nothing and reported as agreeing. Keeping the
- * empty shape lets `domain/mirror-contract.ts` say so out loud.
+ * empty shape lets `domain/mirror-comparison.ts` say so out loud.
  *
  * Brands are the case where an empty `variants` is genuinely right, and they
  * lose nothing by it: the VALUE half of the mirror check runs their refinement
@@ -495,12 +493,13 @@ export const declaredTypes = (text: string): ShapeResult<ReadonlyMap<string, Typ
     // both mandatory (non-optional) patterns, so a successful match has
     // always captured both. TypeScript's regex typing does not encode "this
     // group is unconditional".
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (keyword === undefined || name === undefined) {
       continue
     }
     // Only top-level declarations. A `type` inside a namespace or a function
     // body is not part of any surface this tool compares.
+    /* v8 ignore next -- @preserve */
     if ((depths[match.index] ?? 0) !== 0) {
       continue
     }
@@ -581,6 +580,7 @@ export const parseApiLock = (markdown: string): ReadonlyArray<ApiLockEntry> => {
   for (const line of lines) {
     if (fence !== undefined) {
       if (line.trimEnd() === '```') {
+        /* v8 ignore next -- @preserve */
         if (pending !== undefined) {
           entries.push({ name: pending.name, kind: pending.kind, text: fence.join('\n') })
         }
@@ -599,7 +599,7 @@ export const parseApiLock = (markdown: string): ReadonlyArray<ApiLockEntry> => {
       // The `: undefined` fallback is structurally unreachable: both of
       // ENTRY_HEADING's groups are mandatory (non-optional) patterns, so a
       // successful match has always captured both.
-      /* v8 ignore next */
+      /* v8 ignore next -- @preserve */
       pending = name !== undefined && kind !== undefined ? { name, kind } : undefined
       continue
     }

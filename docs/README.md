@@ -21,12 +21,12 @@
 | --- | --- | --- |
 | [workflow.md](./workflow.md) | **開発ワークフロー。** セットアップ、日々の流れ、`workspace:*` から公開バージョンへの移行 | **全員。最初に読む** |
 | [manifest.md](./manifest.md) | **なぜ `repos.json` が存在するのか。** `pnpm sync` が壊さないもの | 全員。**必読** |
-| [step2-status.md](./step2-status.md) | **横断の現況。** plan.md §6 Step 2 の完了条件「内蔵プレビューが操作可能」を満たすリポジトリは **0 / 15**。その単一のボトルネック | 全員。進捗を語る前に |
+| [step2-status.md](./step2-status.md) | **横断の現況。** plan.md §6 Step 2 の完了条件「内蔵プレビューが操作可能」の監査結果は **5 完了 / 3 部分 / 1 未達 / 6 対象外** | 全員。進捗を語る前に |
 | [architecture.md](./architecture.md) | 4 階層アーキテクチャ、16 リポジトリ依存グラフ、本リポジトリの位置(グラフ外)、名詞/動詞ルール、mc-playground-kit の devDependency 専用ルール | 全員 |
 | [responsibility.md](./responsibility.md) | 持つもの / 持たないもの。**手元の作業を壊さない**という絶対規則 | 実装者・レビュアー |
 | [public-api.md](./public-api.md) | 純粋層の API と契約 | 実装者 |
 | [testing.md](./testing.md) | テスト戦略。**実ネットワーク clone をするテストは書かない** | 実装者・レビュアー |
-| [versioning.md](./versioning.md) | このリポジトリは publish されない。**4 週間 API ロックまで公開を開始しない**ルール | リリース担当 |
+| [versioning.md](./versioning.md) | このリポジトリは publish されない。兄弟リポジトリの公開・昇格方針 | リリース担当 |
 
 ### このリポジトリに無いドキュメント
 
@@ -62,8 +62,9 @@
 | `pnpm update:manifest:latest:dry` | 同上。何も書かない |
 | `pnpm check:workspace` | clone 済みの各リポジトリで `pnpm verify` |
 | `pnpm check:workspace typecheck` | 別のスクリプトを指定して横断実行 |
-| `pnpm check:mirrors` | 手書きミラーと元リポジトリの**形**を突き合わせる。`verify` に入っている |
+| `pnpm check:mirrors` | 手書きミラーと元リポジトリの**形**を突き合わせる。`verify` とは別に実行する |
 | `pnpm check:repoint` | ミラーを実際に消して import を張り替え、**`tsc` を走らせる**。`verify` には入っていない([testing.md](./testing.md) §6.1) |
+| `pnpm check:features` | ルートの統合ソースにある限定された機能証拠を監査。`partial` / `missing` があれば非ゼロ |
 | `pnpm verify` | **このリポジトリ自身**の検査。空の `repos/` でも通る |
 
 ## 4. 絶対規則
@@ -84,14 +85,21 @@
 
 ## 5. 現状
 
-- **`repos.json` の 15 件はすべて `"unpinned"`。** 15 リポジトリのほとんどがまだ存在しないため。
-  架空の SHA で埋めるより、そう書いてあるほうがよい。
-  `pnpm check:workspace` が毎回この状態を報告する
-- **`repos/` は空。** `pnpm sync` が実際に動くのは、リポジトリが GitHub に作られてから
+- **`repos.json` の 15 件は commit SHA に固定されている。** `repos/` は git 管理外の同期先であり、
+  fresh checkout では空だが、`pnpm sync` 後は監査対象の 15 リポジトリが存在する
+- **兄弟リポジトリの実装・テストを含む成果物は各リポジトリ側で完成させる。**
+  ここでは同期、ピン、ミラー監査、repoint 監査だけを行う
+- **機能証拠監査は `pnpm check:features` で行う。** `feature-register.ts` に登録された限定的な
+  仕様をルートの `src/` と `test/` に適用し、`complete` 以外を明示する。これはブラウザ／ネットワーク
+  アダプタや登録簿にない全公式機能の完了宣言ではない
 - **changesets 運用は未決。** [versioning.md](./versioning.md) §6
-- **ロスターの publish は未実装。** 現在は 16 リポジトリが手作業でミラーしている
+- **ロスターを publish する仕組みは未実装。** このルートが管理する同期対象は 15 件で、ミラー削除後の依存切替は各兄弟リポジトリ側で行う
   ([architecture.md](./architecture.md) §3.1)
-- **plan.md §6 Step 2 の完了条件「内蔵プレビューが操作可能」を満たすリポジトリは 0 / 15。**
-  `apps/` ディレクトリがどのリポジトリにも無く、`mc-playground-kit` を依存に持つリポジトリも 0 件である。
-  0 が 15 個並んでいるのではなく、publish 未着手という**1 本の連鎖**の帰結である
-  ([step2-status.md](./step2-status.md))
+- **plan.md §6 Step 2 の状態** — pinned snapshot に対する横断監査では、5 リポジトリが完了、
+  3 が部分完了、1 が未達、6 はプレビュー対象外。
+  詳細と判定根拠は [step2-status.md](./step2-status.md) に記録する
+- **ワークスペース監査の注意** — 現在の worktree で `pnpm check:workspace` を実行すると 14 件通過、
+  `mc-compose` の 1 件が失敗する。失敗は
+  `repos/mc-compose/test/check-roster-manifest.test.ts:302` が、実行中 worktree のパスに含まれる
+  `mc-dev-meta` を候補に含めない前提を持つ環境依存差分である。nested repository は変更しない。
+  ルート自身の `pnpm verify` とこの監査は別のゲートである

@@ -5,14 +5,8 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        maxForks: '50%',
-        minForks: 1,
-        isolate: true,
-        singleFork: false,
-      },
-    },
+    maxWorkers: '50%',
+    isolate: true,
     include: ['test/**/*.test.ts'],
     // `repos/` holds 15 separate projects with their own test suites. Running
     // them from here would be `pnpm check:workspace`'s job, not vitest's.
@@ -30,10 +24,17 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       enabled: false,
-      include: ['src/index.ts', 'src/domain/**/*.ts'],
+      include: [
+        'src/index.ts',
+        'src/domain/**/*.ts',
+        'src/kernel/**/*.ts',
+        'src/render/**/*.ts',
+        'src/audio/**/*.ts',
+        'src/multiplayer/**/*.ts',
+      ],
       // scripts/ is deliberately NOT covered: it is the impure shell, and the
       // only way to cover it would be to run real git against real
-      // repositories. Its decisions live in domain/ and are covered there.
+      // repositories. Its decisions live in domain/ and kernel/ and are covered there.
       //
       // domain/exhaustive.ts's `assertUnreachable` throw is deliberately NOT
       // covered either: TypeScript only lets a caller reach it once every
@@ -50,21 +51,11 @@ export default defineConfig({
         'scripts/**',
         'src/domain/exhaustive.ts',
       ],
-      all: true,
       reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
-      // TEST_STANDARD.md §3: the 4-metric 99% gate is an org-wide decision
-      // applied immediately to all 16 repositories, with no staged rollout and
-      // no per-repository exemption for being "not done yet" — a low number is
-      // a reason for CI to go red, not a reason to withhold the gate.
-      //
-      // Measured at migration time (`pnpm test:coverage`): statements 93.78%,
-      // branches 89.19%, functions 97.82%, lines 93.78%. This does NOT clear
-      // 99% on 3 of the 4 metrics, so enabling this turns CI red here, the same
-      // known-and-accepted way it does for mc-audio / mc-compose /
-      // mc-playground-kit (TEST_STANDARD.md §4). That is expected, not a
-      // reason to defer.
-      thresholds: { branches: 99, functions: 99, lines: 99, statements: 99 },
+      // Keep every metric at 100% so a regression cannot pass merely because
+      // the changed file was not selected by the test runner.
+      thresholds: { branches: 100, functions: 100, lines: 100, statements: 100 },
     },
   },
   esbuild: {

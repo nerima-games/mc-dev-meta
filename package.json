@@ -38,20 +38,24 @@
     "check:workspace": "tsx scripts/check-workspace.ts",
     "check:mirrors": "tsx scripts/check-mirrors.ts",
     "check:repoint": "tsx scripts/check-repoint.ts",
+    "check:features": "tsx scripts/check-features.ts",
     "typecheck": "tsc -p tsconfig.build.json --pretty false && tsc -p tsconfig.test.json --pretty false",
     "lint": "oxlint --deny-warnings src scripts test",
     "lint:fix": "oxlint --fix src scripts test",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test"
+    "verify": "pnpm typecheck && pnpm lint && pnpm test:coverage"
+  },
+  "dependencies": {
+    "effect": "^3.22.1"
   },
   "devDependencies": {
     "@typescript/native": "npm:typescript@7.0.2",
     "@types/node": "^26.1.2",
-    "@vitest/coverage-v8": "^3.2.7",
+    "@vitest/coverage-v8": "^4.1.11",
     "tsx": "^4.23.1",
     "typescript": "npm:@typescript/typescript6@6.0.2",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
   }
 }

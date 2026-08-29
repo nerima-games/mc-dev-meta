@@ -1,8 +1,6 @@
 /**
  * `pnpm sync` — clone or update the 15 managed repositories under `repos/`.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * THE ONE RULE
  * ---------------------------------------------------------------------------
@@ -34,8 +32,8 @@
  * no pinned ref to compare HEAD against, so "up to date" is not a question that
  * can be answered without asking the remote — and it must not do more. It used
  * to do more: `planSync` answered `Fetch` to a state it had just fetched, and
- * the loop below obliged three times over, which made an out-of-the-box
- * `pnpm sync` (15 unpinned entries) 45 network round-trips. See
+ * the loop below obliged three times over. An earlier manifest with all 15
+ * entries unpinned made that defect observable as 45 network round-trips. See
  * `WorkingCopyState.fetchedThisRun` in `domain/sync-plan.ts`.
  *
  * Neither property is asserted here — both are asserted in
