@@ -30,6 +30,7 @@
 | [public-api.md](./public-api.md) | 純粋層の API と契約 | 実装者 |
 | [testing.md](./testing.md) | テスト戦略。**実ネットワーク clone をするテストは書かない** | 実装者・レビュアー |
 | [versioning.md](./versioning.md) | このリポジトリは publish されない。**4 週間 API ロックまで公開を開始しない**ルール | リリース担当 |
+| [toolchain.md](./toolchain.md) | 全 15 リポジトリ共通の toolchain pin 表と、`check:toolchain` / `check:pins` の読み方 | 実装者・レビュアー |
 
 ### このリポジトリに無いドキュメント
 
@@ -73,6 +74,8 @@
 | `pnpm check:portable` | root の portable Chunk/light 契約と clone 済み runtime の実値を突合。未 clone は理由を表示し、比較対象ゼロは失敗 |
 | `pnpm check:mirrors` | 手書きミラーと元リポジトリの**形**を突き合わせる。CI の別ステップ |
 | `pnpm check:repoint` | ミラーを実際に消して import を張り替え、**`tsc` を走らせる**。`verify` には入っていない([testing.md](./testing.md) §6.1)。CI の別ステップ |
+| `pnpm check:toolchain` | 各リポジトリの toolchain を pin 表([toolchain.md](./toolchain.md))と突き合わせる。未 clone は理由を表示し exit 0 |
+| `pnpm check:pins` | 各リポジトリの `@nerima-games/*` pin が兄弟の現行 version と exact 一致するか検査する。未 clone は理由を表示し exit 0 |
 | `pnpm verify` | **このリポジトリ自身**の検査。空の `repos/` でも通る |
 
 ## 4. 絶対規則

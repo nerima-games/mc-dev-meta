@@ -112,6 +112,20 @@ jobs:
       - name: Repoint check
         run: pnpm check:repoint
 
+      # Toolchain check
+      # Audits every cloned repository against the org-wide pin table
+      # (docs/toolchain.md, src/domain/toolchain.ts). SKIPS cleanly on an
+      # empty repos/, same as Workspace / Mirror / Repoint check above.
+      - name: Toolchain check
+        run: pnpm check:toolchain
+
+      # Pins check
+      # Verifies every cloned repository's @nerima-games/* dependency entries
+      # pin the sibling's exact current version (docs/toolchain.md). SKIPS
+      # cleanly on an empty repos/, same as the checks above.
+      - name: Pins check
+        run: pnpm check:pins
+
       # 4-metric 100% coverage gate (TEST_STANDARD.md §3), applied org-wide with
       # no staged rollout. Thresholds live in vitest.config.ts; `vitest run
       # --coverage` itself exits non-zero when a metric falls short.
