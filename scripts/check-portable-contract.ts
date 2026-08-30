@@ -1,7 +1,20 @@
-/** Compare the root portable chunk contract with the checked-out owners. */
-import { access } from 'node:fs/promises'
+/**
+ * Compare the root portable chunk contract with the checked-out owners.
+ *
+ * Skip policy: `repos/` is gitignored and empty in a fresh clone, same as
+ * `check:mirrors` and `check:repoint`. When nothing is cloned there is
+ * nothing to compare, and that is a SKIP, not a failure — see
+ * `domain/portable-contract.ts` for the decision and why it does not extend
+ * to "repos/ has something in it but still nothing to compare".
+ */
+import { access, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import {
+  describeSkippedPortableContractRun,
+  planPortableContractRun,
+  portableContractExitCode,
+} from '../src/domain/portable-contract'
 import {
   blockIndex,
   BLOCK_ID_MAX,
@@ -19,6 +32,7 @@ import {
   LIGHT_LEVEL_MIN,
   setLightAt,
 } from '../src/domain/light-grid'
+import { REPOS_DIRECTORY } from '../src/domain/workspace'
 
 type RuntimeModule = Readonly<Record<string, unknown>>
 
@@ -28,6 +42,14 @@ const skipped: string[] = []
 const comparisons: string[] = []
 
 const relativePath = (file: string): string => path.relative(repositoryRoot, file)
+
+/** True when `repos/` has at least one entry. An absent `repos/` reads as empty, not as an error. */
+const repositoriesCloned = async (): Promise<boolean> => {
+  const entries = await readdir(path.join(repositoryRoot, REPOS_DIRECTORY), { withFileTypes: true }).catch(
+    () => undefined,
+  )
+  return entries !== undefined && entries.some((entry) => entry.isDirectory())
+}
 
 const loadModule = async (label: string, relative: string): Promise<RuntimeModule | undefined> => {
   const file = path.join(repositoryRoot, relative)
@@ -272,28 +294,30 @@ const compareWorldgenLight = async (): Promise<void> => {
 }
 
 const main = async (): Promise<void> => {
-  await Promise.all([compareKernel(), compareWorldgen(), compareWorldgenLight()])
-
-  if (comparisons.length === 0) {
-    failures.push('no runtime comparisons performed')
+  if (!(await repositoriesCloned())) {
+    for (const line of describeSkippedPortableContractRun()) {
+      process.stdout.write(`${line}\n`)
+    }
+    return
   }
 
-  if (failures.length > 0) {
-    for (const failure of failures) {
+  await Promise.all([compareKernel(), compareWorldgen(), compareWorldgenLight()])
+
+  const run = planPortableContractRun(comparisons.length, failures)
+  const exitCode = portableContractExitCode(run)
+
+  if (exitCode !== 0) {
+    for (const failure of run.failures) {
       process.stderr.write(`portable contract: ${failure}\n`)
     }
     for (const reason of skipped) {
       process.stderr.write(`portable contract: skipped ${reason}\n`)
     }
-    process.exitCode = 1
+    process.exitCode = exitCode
     return
   }
 
-  process.stdout.write(
-    comparisons.length === 0
-      ? 'portable contract: no runtime comparisons performed\n'
-      : `portable contract: ${comparisons.length} runtime comparisons passed\n`,
-  )
+  process.stdout.write(`portable contract: ${comparisons.length} runtime comparisons passed\n`)
   for (const comparison of comparisons) {
     process.stdout.write(`portable contract: passed ${comparison}\n`)
   }
