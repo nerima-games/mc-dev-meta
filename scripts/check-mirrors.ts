@@ -2,8 +2,6 @@
  * `pnpm check:mirrors` — compare every hand-written cross-repository mirror
  * against the repository it mirrors.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * The argument for the check, the list of mirrors, and every comparison rule
  * live in `domain/mirror-contract.ts`, which is pure and unit-tested against
  * fixtures. This file is the shell: it decides which repositories are on disk,
@@ -62,21 +60,14 @@
  *   - and of course an actual disagreement.
  *
  * ---------------------------------------------------------------------------
- * Why this runs in `pnpm verify`
+ * Why this is a separate cross-repository gate
  * ---------------------------------------------------------------------------
  *
- * Because it costs nothing when there is nothing to check, and because a check
- * that is not in `verify` is a check that runs on the day someone remembers to
- * run it — which is never the day the drift is introduced. `pnpm api:check` is
- * in `verify` for exactly this reason and this is its cross-repository sibling.
- *
- * The counter-argument is real and worth stating: this is the only member of
- * `verify` whose result depends on files outside the repository, so `verify`
- * can now pass on one machine and fail on another with the same commit. That is
- * true, and it is the point. The composite state is pinned in `repos.json`; a
- * disagreement between two pinned revisions IS a property of this commit of
- * mc-dev-meta, and it is not a property of any other repository's commit,
- * because no other repository can see both.
+ * `pnpm verify` is this repository's deterministic local gate. This check is
+ * separate because it reads checked-out sibling repositories, whose presence
+ * and working-tree state are external to this repository. CI invokes both
+ * explicitly, and an absent checkout is reported as a reasoned skip rather
+ * than silently turning the cross-repository gate into a local one.
  *
  * ---------------------------------------------------------------------------
  * Which checkout, and why the report has to say so
@@ -118,6 +109,7 @@ import {
   type TranscribedColumn,
   type ValueObservation,
 } from '../src/domain/mirror-contract'
+import type { RosterObservation } from '../src/domain/mirror-roster'
 import { loadManifest, provenanceOf } from './repos-provenance'
 import { REPOS_DIRECTORY } from '../src/domain/workspace'
 import {
@@ -286,6 +278,28 @@ const observeValues = (module: Readonly<Record<string, unknown>>): ReadonlyArray
     .filter((name) => name !== 'default')
     .sort()
     .map((name) => observeValue(name, module[name]))
+
+const observeRoster = (
+  label: string,
+  module: Readonly<Record<string, unknown>>,
+  name: string,
+): RosterObservation => {
+  const value = module[name]
+  if (!Array.isArray(value)) {
+    throw new MirrorCheckError(`${label} exports ${name} as ${typeof value}; expected an array of strings.`)
+  }
+
+  const members = value.map((member, index) => {
+    if (typeof member !== 'string') {
+      throw new MirrorCheckError(
+        `${label} exports ${name}[${String(index)}] as ${typeof member}; expected a string.`,
+      )
+    }
+    return member
+  })
+
+  return { name, members }
+}
 
 const typesIn = (label: string, text: string): ReadonlyArray<TypeShape> => {
   const parsed = declaredTypes(text)
@@ -577,6 +591,7 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
       spec.source,
       ...spec.capabilities.map((probe) => probe.owner),
       ...spec.properties.map((probe) => probe.owner),
+      ...spec.rosters.map((probe) => probe.owner),
     ]),
   ]
   const owners = new Map(
@@ -616,6 +631,14 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
     readProperty(spec, mirrorModule.module, ownerModule(probe.owner), probe),
   )
 
+  const rosters: Array<RosterObservation> = spec.rosters.map((probe) =>
+    observeRoster(mirrorPath(spec), mirrorModule.module, probe.mirrorExport),
+  )
+
+  const sourceRosters: Array<RosterObservation> = spec.rosters.map((probe) =>
+    observeRoster(`${probe.owner}/${ENTRY_POINT}`, ownerModule(probe.owner), probe.sourceExport),
+  )
+
   const lockTypes = typesInApiLock(lockText)
   if (!lockTypes.ok) {
     throw new MirrorCheckError(
@@ -628,6 +651,7 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
     types: typesIn(mirrorPath(spec), mirrorText).filter((shape) => shape.exported),
     capabilities,
     properties,
+    rosters,
     probeableColumns: transcribedColumns(
       mirrorModule.module,
       new Map(ownerNames.map((name) => [name, ownerModule(name)])),
@@ -637,6 +661,7 @@ const checkOne = async (spec: MirrorSpec, present: ReadonlySet<string>): Promise
   const source: SourceObservation = {
     values: observeValues(sourceModule.module),
     types: [...lockTypes.value.values()],
+    rosters: sourceRosters,
     published: publishedNames(lockText),
   }
 

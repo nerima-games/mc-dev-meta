@@ -2,8 +2,6 @@
  * `pnpm check:repoint` — actually perform the repoint every mirror header
  * promises, and compile it.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * The argument for the gate, the list of repoints, the rewrite rule and every
  * decision about what a diagnostic means live in `domain/repoint-plan.ts`,
  * which is pure and unit-tested against fixtures. This file is the shell: it

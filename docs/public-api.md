@@ -40,7 +40,7 @@ const buildOrder: () => ReadonlyArray<string> | undefined   // undefined = 循�
 `.oxlintrc.json#no-restricted-imports` に移った([architecture.md](./architecture.md) §3.1、
 DEPENDENCY_POLICY.md)。したがって現時点でこのロスターを読みに来る「ゲートのコピー」は
 他リポジトリ側には存在しない — このモジュールは mc-dev-meta 自身の `pnpm sync` /
-`pnpm update:manifest` / `pnpm check:workspace` / `pnpm check:mirrors` / `pnpm check:repoint`
+`pnpm update:manifest` / `pnpm check:workspace` / `pnpm check:portable` / `pnpm check:mirrors` / `pnpm check:repoint`
 が読む、内部利用の参照コピーである。
 
 `mc-kernel` はどの `dependsOn` にも現れない(どこからでも import 可のため)。
@@ -195,11 +195,29 @@ const describeWorkspaceRun: (plan, command) => ReadonlyArray<string>
 
 **`empty` も `partial` も失敗ではない。** 例外を返す関数も非ゼロを返す関数もここには無い。
 
-## 5. まだ無いもの
+## 5. Portable chunk/light data (`domain/voxel-chunk.ts`, `domain/light-grid.ts`)
+
+runtime package に依存せず、複数 repository が共有できる最小の data contract を公開する。
+Chunk と light grid は同じ Y-major voxel index を使うが、保存・生成・伝播・meshing の
+runtime logic はここに置かない。
+
+| API | 契約 |
+| --- | --- |
+| `createChunkFromBlocks` / `blockIndex` | `16 × 256 × 16` の one-byte block data と Y-major index |
+| `encodeChunk` / `decodeChunk` | `MCCH` version 1、固定長 little-endian wire codec |
+| `createLightGrid` / `createChunkLight` | sky と block の各 `32,768` byte packed grid |
+| `getLightAt` / `setLightAt` | even voxel は low nibble、odd voxel は high nibble |
+| `cloneLightGrid` / `clampLightLevel` | buffer copy と `0..15` light level の境界処理 |
+
+Chunk の形式は [portable-chunk.md](./portable-chunk.md)、light の形式は
+[portable-light-grid.md](./portable-light-grid.md) が正本である。`pnpm check:portable` は
+clone 済み `mc-kernel` / `mc-worldgen` の公開 export と有効な入力の実値を突合する。
+
+## 6. まだ無いもの
 
 | 未実装 | 備考 |
 | --- | --- |
-| ロスターの publish(consume する側は今のところ mc-dev-meta 自身のみ) | [architecture.md](./architecture.md) §3.1 |
+| runtime 向けロスター package の publish(root 内部の参照コピーとしてのみ保持) | [architecture.md](./architecture.md) §3.2 |
 | `workspace:*` → pin 済みバージョンへの一括切り替え支援 | [versioning.md](./versioning.md) §3 |
 | 並列 sync | 逐次で十分。出力の可読性を優先している |
 

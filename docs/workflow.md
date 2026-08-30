@@ -44,7 +44,7 @@ $ find . -path ./node_modules -prune -o -name '*.ts' -not -name '*.test.ts' -pri
 ```console
 $ git clone https://github.com/nerima-games/mc-dev-meta.git
 $ cd mc-dev-meta
-$ direnv allow          # flake.nix の devShell で nodejs_22 + corepack + oxlint が入る
+$ direnv allow          # flake.nix の devShell で nodejs_24 + corepack + oxlint が入る
 $ pnpm install          # このリポジトリ自身の devDependencies(oxlint は含まない。上記 devShell 由来)
 $ pnpm sync             # 15 リポジトリを repos/ へ clone
 $ pnpm install          # ここで repos/* が workspace として解決される
@@ -117,7 +117,44 @@ clone されているリポジトリだけを、**マニフェスト順**に、�
 `repos/` が空でも部分的でも失敗しない — ボトムアップ構築(plan.md §6 Step 2)では
 ロスターの大半がまだ存在しないのが正常な状態だからである。
 
-### 3.3 合成状態を記録する
+### 3.3 横断機能監査
+
+```console
+$ pnpm check:features
+$ pnpm check:portable
+$ pnpm check:mirrors
+$ pnpm check:repoint
+```
+
+`check:features` は root の機能カタログ、所有境界、root と clone 済み下流リポジトリの証拠パスを検証する。
+未 clone のリポジトリは理由つきで skip される。これは runtime の実装や公式 Minecraft の parity 完了を証明するゲートではない。
+`check:portable` は root の Chunk/light 契約を mc-kernel と mc-worldgen の runtime export の実値と比較する。
+未 clone の owner は理由を表示して skip するが、runtime comparison が一つも実行されなければ成功扱いにしない。
+workspace / portable / mirror / repoint も `pnpm verify` とは別の実行ゲートであり、依存する checkout の状態を結果に明示する。
+
+### 3.3.1 作業単位を `main` へ反映する
+
+複数の作業が同じ branch / worktree に混在している場合は、責務のまとまりごとに差分を分けて確認し、1 作業単位 1 コミットで記録する。各単位の反映前に、変更対象を明示したうえで次のゲートを実行する。
+
+```console
+$ git diff --check
+$ pnpm verify
+$ pnpm check:features
+$ pnpm check:portable
+$ pnpm check:mirrors
+$ pnpm check:repoint
+$ pnpm check:workspace
+$ pnpm test:coverage
+$ nix flake check --no-write-lock-file --no-build --all-systems
+```
+
+`check:workspace` が clone 済み下流リポジトリの状態で失敗した場合は、失敗したリポジトリと理由を記録する。このリポジトリの作業単位に含まれない nested repository の変更を、ゲートを通すために書き換えたり削除したりしてはいけない。
+
+ゲートを通過した単位だけを明示的な pathspec でコミットし、ローカル `main` へ反映する。反映後はその単位の差分が残っていないことを確認し、完了した一時 branch / worktree だけを削除する。他の session が使用中の worktree、branch、nested repository は対象にしない。リモートへ送る場合は、別途 push の承認を得る。
+
+`.corepack/` など、devShell や `corepack enable` が生成する環境依存のリンクは、ソースの作業単位に含めない。削除前に、ソース差分が `main` に反映済みであることと、残る差分が生成物だけであることを確認する。
+
+### 3.4 合成状態を記録する
 
 ```console
 $ # 各リポジトリでコミットした後
@@ -130,7 +167,7 @@ $ git add repos.json && git commit -m "Pin repos to <何をしたか>"
 「火曜には E2E が通っていた」が指す成果物が存在しないことになる。
 詳細は [manifest.md](./manifest.md)。
 
-### 3.4 誰かの pin に合わせる
+### 3.5 誰かの pin に合わせる
 
 ```console
 $ git pull                # repos.json が更新される
@@ -142,7 +179,7 @@ $ pnpm install
 未コミットの変更があるリポジトリは触らずにスキップし、その旨を出力する。
 [manifest.md](./manifest.md) §3 参照。
 
-### 3.5 GitHub 側の最新に追いつく
+### 3.6 GitHub 側の最新に追いつく
 
 `pnpm sync` と `pnpm update:manifest` だけでは、**pin は決して進まない**。
 sync は `repos/ <- pin` を書き、update:manifest は `pin <- repos/ HEAD` を書くので、

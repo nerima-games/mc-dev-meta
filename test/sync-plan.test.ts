@@ -422,6 +422,12 @@ describe('nothing is advanced over work that exists only here', () => {
     expect(summary.skippedDiverged).toStrictEqual(['mc-kernel'])
     expect(summary.checkedOut).toStrictEqual([])
   })
+
+  it('lists a checked-out entry separately from unchanged entries', () => {
+    expect(summarise([{ _tag: 'Checkout', name: 'mc-kernel', ref: SHA_A, source: 'manifest' }]).checkedOut).toStrictEqual([
+      'mc-kernel',
+    ])
+  })
 })
 
 describe('no reachable git command can destroy work', () => {

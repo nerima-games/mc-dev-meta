@@ -2,8 +2,6 @@
  * What was under `repos/` when a cross-repository gate ran, and whether it was
  * the revision `repos.json` pins.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * Extracted from `scripts/check-mirrors.ts` when `scripts/check-repoint.ts`
  * needed the same answer. It is the impure half only — the git calls and the
  * manifest read. The DECISION about what the answer means (`isOffPin`,

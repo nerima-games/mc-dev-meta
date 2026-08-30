@@ -216,7 +216,7 @@ pin 留めツールにとってこれ以上悪い壊れ方はない — 失敗�
 実害も出た。`pnpm check:mirrors` は `repos/` を読む。
 つまりこの組織の 3 つある横断ゲートの 1 つが、
 **進みようのないスナップショット**と比較し続けていた。
-実際に、作業コピーが `mx-gameplay/domain/chunk-store-port.ts:347` で
+実際に、過去の作業コピーが削除済みの ChunkStore ミラーから
 export しているものを「mirror に無い」と報告した。これは drift に見え、診断を 1 つ消費した。
 逆向きはもっと悪い — pin 以降に本当に drift した mirror を **OK と報告する**。
 
@@ -310,7 +310,8 @@ submodule は「親リポジトリが子のリビジョンを持つ」という�
 
 - submodule は checkout 時に**自動で作業コピーを動かす**。
   このプロジェクトの前提は「手元の作業を絶対に壊さない」であり、その制御が要る
-- 16 リポジトリすべてが対等であり、mc-dev-meta は**親ではない**。
+- 15 runtime リポジトリは対等であり、mc-dev-meta は**親ではない**。root は workspace
+  tooling と portable data contract を管理するが、runtime package の親にはならない。
   submodule は親子関係を前提にする
 - pnpm workspace として束ねるのに submodule である必要が無い。必要なのは `repos/*` にディレクトリがあること
 - dirty な submodule に対する挙動が、ツールとバージョンによって違いすぎる

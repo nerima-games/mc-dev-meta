@@ -3,19 +3,22 @@
 ## 1. 一行で
 
 **15 リポジトリを `repos/` に clone し、1 つの pnpm workspace として束ねる。
-そして合成状態を `repos.json` に記録する。**(plan.md §6 Step 0 item 2)
+portable な Chunk/light data contract を管理し、合成状態を `repos.json` に記録する。**
 
 ## 2. 持つもの
 
 | 責務 | 実装 | 純粋か |
 | --- | --- | --- |
-| 16 リポジトリのロスターと依存グラフ(参照コピー) | `domain/repository-roster.ts` | 純粋 |
+| 全16リポジトリ(15 runtime + meta)のロスターと依存グラフ(参照コピー) | `domain/repository-roster.ts` | 純粋 |
 | マニフェストのパース・検証・書き出し | `domain/manifest.ts` | 純粋 |
 | **同期判断**(clone / fetch / checkout / skip) | `domain/sync-plan.ts` | **純粋** |
 | ワークスペース実行の計画 | `domain/workspace.ts` | 純粋 |
+| portable Chunk/light data と Chunk の固定 wire codec | `domain/voxel-chunk.ts`, `domain/light-grid.ts` | 純粋 |
 | git を実際に叩く | `scripts/sync-repos.ts` | 不純 |
 | マニフェストの pin 更新 | `scripts/update-manifest.ts` | 不純 |
 | 全リポジトリ横断チェック | `scripts/check-workspace.ts` | 不純 |
+| 機能棚卸しと根拠ファイルの監査 | `src/domain/feature-inventory.ts`, `scripts/check-feature-inventory.ts` | 純粋 / 不純 |
+| portable contract と runtime 実値の突合 | `src/domain/voxel-chunk.ts`, `src/domain/light-grid.ts`, `scripts/check-portable-contract.ts` | 純粋 / 不純 |
 | pnpm workspace 定義 | `pnpm-workspace.yaml` | — |
 | 合成状態の記録 | `repos.json`(コミット済み) | — |
 
@@ -84,7 +87,7 @@ pin されたエントリは「ref に着いた」ことで終われるが、`un
 
 | 持たない | 理由 |
 | --- | --- |
-| **実行時依存** | 15 リポジトリを取ってくるツールが、それらからブートストラップされてはならない。`effect` も入れない |
+| downstream の実行時依存 | 15 リポジトリを取ってくるツールが、それらからブートストラップされてはならない。`effect` も入れない。portable data contract はこの制約の内側で管理する |
 | ゲームコード | ゲームグラフの外にいる |
 | `repos/` の中身 | gitignore。ベンダリングは分割の意味を消す |
 | 自分自身を workspace メンバーにする設定 | 同上の循環 |

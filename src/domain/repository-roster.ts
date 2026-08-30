@@ -1,8 +1,6 @@
 /**
  * The 16-repository roster and its dependency graph — the REFERENCE COPY.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * Why this lives here
  * ---------------------------------------------------------------------------
@@ -249,7 +247,7 @@ export const buildOrder = (): ReadonlyArray<string> | undefined => {
         // one entry per REPOSITORY_NAMES member (see its definition above),
         // so `.get(name)` for any name drawn from REPOSITORY_NAMES is always
         // defined.
-        /* v8 ignore next */
+        /* v8 ignore next -- @preserve */
         [...(DEPENDENCY_GRAPH.get(name) ?? [])].every((dependency) => !remaining.has(dependency)),
     )
 
@@ -258,7 +256,7 @@ export const buildOrder = (): ReadonlyArray<string> | undefined => {
     // `buildOrder` takes no parameters, so there is no way to drive this arm
     // without a genuinely cyclic DEPENDENCY_GRAPH, which would itself be the
     // bug this branch exists to catch.
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (ready.length === 0) {
       return undefined
     }

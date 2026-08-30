@@ -2,7 +2,8 @@
 
 ## 1. 4 階層アーキテクチャ
 
-plan.md §2.2 の 4 階層。16 リポジトリはすべてこのいずれかに属する。
+plan.md §2.2 の 4 階層。15 個の runtime repository はすべてこのいずれかに属し、
+mc-dev-meta は workspace tooling と portable data contract を担う。
 
 | 階層 | リポジトリ | 性質 |
 | --- | --- | --- |
@@ -10,7 +11,7 @@ plan.md §2.2 の 4 階層。16 リポジトリはすべてこのいずれかに
 | 基盤 | mc-worldgen / mc-sim / mc-render / mc-playground-kit | 状態とサービス(**名詞**)。体験モジュールが乗る土台 |
 | 体験モジュール | mx-gameplay / mx-redstone / mx-ui / mx-multiplayer | ルールと UI(**動詞**)。互いを知らず、基盤サービス経由でのみ会話する |
 | 合成 | mc-compose | Layer マージ + stage 順序表 + E2E。ロジックを持たない |
-| **(グラフ外)** | **mc-dev-meta** | **開発時ワークスペース束ね役。ゲームグラフには参加しない** |
+| **(グラフ外)** | **mc-dev-meta** | **開発時ワークスペース束ね役。portable contract を管理し、ゲーム runtime グラフには参加しない** |
 
 この表は `domain/repository-roster.ts` に機械可読な形で入っており、
 `test/roster.test.ts` が階層ごとの件数(6 / 4 / 4 / 1 / 1)を固定している。
@@ -86,9 +87,17 @@ graph BT
 
 を検証している。
 
-## 3. このリポジトリの位置 ― グラフの外
+## 3. このリポジトリの位置 ― runtime グラフの外
 
-**mc-dev-meta は依存を持たず、誰からも依存されない。**
+**mc-dev-meta は runtime 依存を持たず、runtime repository から依存されない。**
+
+これは portable data contract を管理しないという意味ではない。ゲームの
+bootstrap に依存しない値オブジェクトと wire format は、この repository の
+純粋な canonical module として管理できる。runtime の地形生成・保存・描画・
+ゲームプレイは引き続き下流 repository が所有する。Chunk data の runtime lifecycle は
+`mc-worldgen`、versioned な保存形式と storage codec は `mc-save`、固定された
+portable boundary はこの repository が所有し、`mc-kernel` は共有語彙と capability
+契約に限定する。
 
 15 リポジトリすべてを管理するツールが、それらの依存グラフの参加者であってはならない。
 参加者だったら、ブートストラップに「自分が取ってくるためのパッケージ」が要ることになる。
@@ -102,7 +111,25 @@ graph BT
 
 `test/workspace.test.ts` がこの 4 つをすべて固定している。
 
-### 3.1 それでもロスターを持つ
+### 3.1 Portable data contract
+
+`src/domain/voxel-chunk.ts` は mc-kernel の one-byte `BlockId` 契約と
+mc-worldgen の Y-major chunk layout を根拠にした、依存なしの Chunk data／wire
+codec である。これは runtime package dependency や下流の service adapter ではなく、
+複数 repository が共有できる最小の data boundary である。仕様と検証は
+[portable-chunk.md](./portable-chunk.md) にまとめる。
+
+`src/domain/light-grid.ts` は同じ Chunk index を使う sky/block light の 4-bit packed
+data contract である。光量の nibble 操作と buffer 検証だけを持ち、光の伝播・遮蔽・発光源の
+runtime logic は `mc-worldgen` の責務として重複させない。仕様と検証は
+[portable-light-grid.md](./portable-light-grid.md) にまとめる。
+
+mc-kernel は Chunk data/light の owner ではないため、root の portable module がこの
+固定 boundary を管理する。`check:portable` は clone 済み owner の実値 parity を検証し、
+少なくとも一つの runtime comparison が実行されなければ成功扱いにしない。
+`check:mirrors` と `check:repoint` は、移植期間に残る mirror/import の監査を担う。
+
+### 3.2 それでもロスターを持つ
 
 依存はしないが、**16 リポジトリの名前と依存グラフは知っている必要がある**
 — それを clone し、workspace として束ねるのが仕事だからである。

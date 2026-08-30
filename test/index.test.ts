@@ -6,19 +6,21 @@
  * 0% coverage even though every symbol it re-exports is otherwise fully
  * tested. This file's only job is to prove the barrel itself — the surface a
  * consumer would actually import — wires each re-export through correctly,
- * by calling one real function from each of the five re-exported modules
+ * by calling one real function from each of the seven re-exported modules
  * THROUGH THE BARREL and checking a real result.
  */
 import { describe, expect, it } from 'vitest'
 import {
   describeAction,
   describePinDecision,
+  FEATURE_INVENTORY_VALIDATION,
   MANAGED_REPOSITORY_NAMES,
   MANIFEST_VERSION,
   packageNameOf,
   parseManifest,
   planWorkspaceRun,
   UNPINNED,
+  blockId,
 } from '../src/index'
 
 describe('the public API barrel', () => {
@@ -29,6 +31,14 @@ describe('the public API barrel', () => {
     })
     const parsed = parseManifest(raw)
     expect(parsed.ok).toBe(true)
+  })
+
+  it('re-exports domain/feature-inventory', () => {
+    expect(FEATURE_INVENTORY_VALIDATION.ok).toBe(true)
+  })
+
+  it('re-exports domain/voxel-chunk', () => {
+    expect(blockId(7)).toBe(7)
   })
 
   it('re-exports domain/pin-plan', () => {

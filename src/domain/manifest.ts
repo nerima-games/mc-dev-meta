@@ -2,8 +2,6 @@
  * The repository manifest: parsing and validation. PURE — no filesystem, no
  * git, no network.
  *
- * PRE-AUDIT FIRST CUT (叩き台).
- *
  * ---------------------------------------------------------------------------
  * Why a committed manifest exists at all
  * ---------------------------------------------------------------------------
@@ -254,7 +252,7 @@ export const parseManifest = (raw: string): Parsed<Manifest> => {
     // can start with '-'), so no fixture can drive this arm without breaking
     // the guarantee above it. Excluded from coverage rather than forced with a
     // fixture that could only reach it by first weakening `isValidRef`.
-    /* v8 ignore next 3 */
+    /* v8 ignore next 3 -- @preserve */
     if (isOptionLike(ref.value)) {
       return fail({ _tag: 'InvalidRef', name: name.value, ref: ref.value })
     }
@@ -400,7 +398,7 @@ export const describeManifestError = (error: ManifestError): string => {
     // Structurally unreachable: every ManifestError tag is handled above, so
     // TypeScript only accepts this call because `error` has narrowed to
     // `never`. See src/domain/exhaustive.ts.
-    /* v8 ignore next 2 */
+    /* v8 ignore next 2 -- @preserve */
     default:
       return assertUnreachable(error)
   }
