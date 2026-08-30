@@ -119,6 +119,22 @@ const runIn = async (name: string): Promise<RunOutcome> => {
     }
   }
 
+  // Repositories whose tests import the package by its own name (mc-kernel's
+  // public-api suite) need dist/ to exist before verify — their own CI builds
+  // first for the same reason, so a bare verify here reports a false red.
+  if (requestedScript === 'verify' && (await hasScript(directory, 'build'))) {
+    const build = await execFileAsync('pnpm', ['run', 'build'], {
+      cwd: directory,
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+    }).catch((cause: unknown) => cause)
+    if (build instanceof Error) {
+      const stderr = 'stderr' in build && typeof build.stderr === 'string' ? build.stderr : ''
+      const stdout = 'stdout' in build && typeof build.stdout === 'string' ? build.stdout : ''
+      return { name, status: 'failed', detail: `(build before verify) ${stdout}${stderr}`.trim() }
+    }
+  }
+
   const result = await execFileAsync('pnpm', ['run', requestedScript], {
     cwd: directory,
     encoding: 'utf8',
