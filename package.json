@@ -16,9 +16,9 @@
   "license": "MIT",
   "engines": {
     "node": ">=24.0.0",
-    "pnpm": ">=11.22.0"
+    "pnpm": ">=11.24.0"
   },
-  "packageManager": "pnpm@11.22.0",
+  "packageManager": "pnpm@11.24.0",
   "keywords": [
     "minecraft",
     "typescript",
@@ -40,6 +40,8 @@
     "check:mirrors": "tsx scripts/check-mirrors.ts",
     "check:portable": "tsx scripts/check-portable-contract.ts",
     "check:repoint": "tsx scripts/check-repoint.ts",
+    "check:toolchain": "tsx scripts/check-toolchain.ts",
+    "check:pins": "tsx scripts/check-pins.ts",
     "typecheck": "tsc -p tsconfig.build.json --pretty false && tsc -p tsconfig.test.json --pretty false",
     "lint": "oxlint --deny-warnings src scripts test",
     "lint:fix": "oxlint --fix src scripts test",
@@ -49,10 +51,10 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {
-    "@typescript/native": "npm:typescript@7.0.2",
-    "@types/node": "26.2.0",
-    "@vitest/coverage-v8": "4.1.10",
+    "typescript": "7.0.2",
+    "@types/node": "26.4.0",
+    "@vitest/coverage-v8": "4.1.11",
     "tsx": "4.23.12",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }

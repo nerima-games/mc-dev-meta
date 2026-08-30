@@ -28,3 +28,8 @@ export * from './domain/workspace'
 // by tsconfig.build.json and unit-tested like everything else in domain/; they
 // are simply not part of what this package would offer a consumer if it were
 // ever published.
+//
+// `domain/toolchain.ts`, `domain/toolchain-audit.ts` and `domain/pin-audit.ts`
+// are excluded for the same reason: the data and decision layers of
+// `pnpm check:toolchain` / `pnpm check:pins`, not part of the binder's own
+// public surface.
