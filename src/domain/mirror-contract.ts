@@ -255,29 +255,28 @@ export type MirrorSpec = {
  * kernel vocabulary and session boundary`, merged into `origin/main` today
  * (2026-08-30) via `rescue/local-main-20260830-signed`. `package.json`
  * already pins `@nerima-games/mc-kernel@0.4.0` as a real dependency. This
- * means the work the runbook describes as W1-M1 has already landed upstream
- * of this session — mc-compose is not one of the ten rows below, and the
- * W1-M1 task in `~/Desktop/minecraft.md` §5.2 should be re-checked against
- * the tree rather than run as written.
+ * means mc-compose's mirror was repointed upstream before this change landed
+ * — mc-compose is not one of the ten rows below, and any downstream task
+ * still planning to repoint it should re-check the tree first.
  *
  * `mx-gameplay/src/domain/position-key.ts` and `block-position-key.ts` are
- * the two rows this file's own header calls "W1-M0 で判定" (`~/Desktop/
- * minecraft.md` §1.6 row 10, appendix K): unlike every other row, NEITHER
- * file's header says "mirror" or "restated" or "scheduled for deletion" —
- * `position-key.ts`'s only doc comment is "Canonical coordinate key for
- * gameplay work queues", and `block-position-key.ts` already imports
- * `adjacentBlockPosition`, `blockPosition` and `horizontalBlockNeighbours`
- * from the PUBLISHED `@nerima-games/mc-kernel` for part of its own
- * implementation. Appendix K's investigation (already completed in an
- * earlier session) found kernel's `coordinate-keys.ts` carries the same
- * concept under different names (`positionKeyOf` → `blockPositionKeyOf`,
+ * the two rows in this list whose registration is a judgment call rather
+ * than a header match: unlike every other row, NEITHER file's header says
+ * "mirror" or "restated" or "scheduled for deletion" — `position-key.ts`'s
+ * only doc comment is "Canonical coordinate key for gameplay work queues",
+ * and `block-position-key.ts` already imports `adjacentBlockPosition`,
+ * `blockPosition` and `horizontalBlockNeighbours` from the PUBLISHED
+ * `@nerima-games/mc-kernel` for part of its own implementation. Diffing
+ * against kernel's `coordinate-keys.ts` shows it carries the same concept
+ * under different names (`positionKeyOf` → `blockPositionKeyOf`,
  * `below`/`above` → `adjacentBlockPosition`, `horizontalNeighbours` →
- * `horizontalBlockNeighbours`) and concluded both files should be deleted.
- * They are included here on that basis, not on the header test the rest of
- * this list uses — `compareValues` has no rename mechanism for VALUES (only
+ * `horizontalBlockNeighbours`), so both files are a duplicate implementation
+ * that should be deleted in favour of the kernel functions. They are
+ * included here on that basis, not on the header test the rest of this list
+ * uses — `compareValues` has no rename mechanism for VALUES (only
  * `MirrorSpec.renamedTypes`, and only for types), so every renamed function
- * will read as `SymbolNotPublished` against kernel's barrel. That is the
- * real, reportable difference appendix K already predicted, not a defect in
+ * will read as `SymbolNotPublished` against kernel's barrel. That is a real,
+ * reportable difference this row is expected to surface, not a defect in
  * this registry.
  */
 export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
@@ -335,12 +334,11 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     // validSpawnSurface, canSupportAttachments) and one property probe
     // (supportRuleOfBlockId/supportRule) lived here and caught two real
     // defects (a missing `isReplaceable` id, and `validSpawnSurface`
-    // disagreeing on oak_log). Appendix K's last row (`~/Desktop/
-    // minecraft.md`) records that a probe row is ALSO an ownership claim that
-    // was never itself checked — see the long comment above `MIRROR_SPECS`
-    // in the pre-W1-M0 version of this file for the incident that motivated
-    // it — and directs W1-M0 to remove every probe row workspace-wide, since
-    // the mirror they probe is itself scheduled for deletion this Wave.
+    // disagreeing on oak_log). They were removed on 2026-08-30 along with
+    // every other capability/property probe in this file: a probe row is
+    // ALSO an ownership claim that was never itself checked (see the git
+    // history of this file for the incident that motivated the original
+    // probes), and the mirror they probe is itself scheduled for deletion.
     // Removing them trades away real coverage for a file that still exists
     // today: without a capability probe, `fallsWhenUnsupported`,
     // `isReplaceable`, `validSpawnSurface` and `canSupportAttachments` fall
@@ -348,7 +346,7 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     // any of the four under that name (they live behind
     // `capabilityOfBlockId`) — so `pnpm check:mirrors` is expected to report
     // `SymbolNotPublished` for all four, plus for `supportRuleOfBlockId`,
-    // until W1-M4 deletes this file.
+    // until this file is deleted.
     repository: 'mx-gameplay',
     file: 'src/domain/block-vocabulary.ts',
     source: 'mc-kernel',
@@ -362,9 +360,9 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     // legitimate `dependencies` edge (plan.md §2.1) that is simply not
     // published yet — see the file's own header. Source is mc-worldgen, not
     // mc-kernel, even though `BlockId`/`BlockPosition`/`ChunkCoord` in the same
-    // file come from kernel's vocabulary (appendix E.5): this row's `source`
-    // names the repository whose BARREL the file will be deleted in favour of,
-    // which is mc-worldgen for `ChunkStore` itself.
+    // file come from kernel's vocabulary: this row's `source` names the
+    // repository whose BARREL the file will be deleted in favour of, which is
+    // mc-worldgen for `ChunkStore` itself.
     repository: 'mx-gameplay',
     file: 'src/domain/chunk-store-port.ts',
     source: 'mc-worldgen',
@@ -375,12 +373,12 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
   },
   {
     // `PROVISIONAL LOCAL MIRROR of @nerima-games/mc-worldgen's
-    // domain/portal-frame.ts` per the file's own header. Appendix K found
-    // mc-kernel carries an export-identical `src/domain/portal-frame.ts` and
-    // judged kernel canonical for the EVENTUAL repoint (W1-M5) — but that is a
-    // decision about where the future import points, not about what this file
-    // currently declares itself to mirror, so `source` stays `mc-worldgen`
-    // here, matching the header.
+    // domain/portal-frame.ts` per the file's own header. mc-kernel also
+    // carries an export-identical `src/domain/portal-frame.ts`, and a diff of
+    // the two shows kernel as the canonical version for the EVENTUAL repoint
+    // — but that is a decision about where the future import points, not
+    // about what this file currently declares itself to mirror, so `source`
+    // stays `mc-worldgen` here, matching the header.
     repository: 'mx-gameplay',
     file: 'src/domain/portal-frame-port.ts',
     source: 'mc-worldgen',
@@ -392,9 +390,9 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
   {
     // Already a two-line re-export from the published `@nerima-games/mc-kernel`
     // rather than a hand-transcription — mid-migration, not yet deleted. Kept
-    // as a row because `~/Desktop/minecraft.md` §1.6 keeps it (mc-kernel の 2
-    // 行 re-export、§2.10 の削除対象) and because a live spec is what makes
-    // `check:mirrors` notice when the file is finally deleted.
+    // as a row because a live spec is what makes `check:mirrors` notice when
+    // the file is finally deleted, and it is tracked for removal along with
+    // the other kernel mirrors in this repository.
     repository: 'mx-gameplay',
     file: 'src/domain/item-vocabulary.ts',
     source: 'mc-kernel',
@@ -405,7 +403,8 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
   },
   {
     // See the note above `MIRROR_SPECS`: no "mirror/restated" header, included
-    // on appendix K's judgment rather than this file's own claim. Expect
+    // on the strength of its duplicate relationship with kernel's
+    // `coordinate-keys.ts` rather than this file's own claim. Expect
     // `SymbolNotPublished` findings for every renamed export
     // (`positionKeyOf`, `positionOfKey` — this file's own two exports).
     repository: 'mx-gameplay',
@@ -421,7 +420,8 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     // (`positionKeyOf`, `positionOfKey`, `below`, `above`, `horizontalNeighbours`)
     // are ALL renamed relative to kernel's `coordinate-keys.ts` /
     // `coordinate-neighbours.ts`, so every one is expected to read as
-    // `SymbolNotPublished` until W1-M3 deletes this file and repoints callers.
+    // `SymbolNotPublished` until this file is deleted and callers are
+    // repointed at the kernel functions directly.
     repository: 'mx-gameplay',
     file: 'src/domain/block-position-key.ts',
     source: 'mc-kernel',

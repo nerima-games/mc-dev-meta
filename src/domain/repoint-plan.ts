@@ -151,8 +151,7 @@ export type RepointSpec = {
  * `mx-gameplay/inventory-port.ts` and `mx-redstone/frame-contract.ts` are
  * gone (neither exists on `origin/main`; see the removed-rows note in
  * `domain/mirror-contract.ts`), and mc-kernel, mc-meshing and mc-worldgen are
- * all published (`~/Desktop/minecraft.md` §1.6: "kernel 0.5.0 / meshing
- * 0.1.4 / worldgen 0.1.14 はすべて publish 済み"), which is what makes every
+ * all published packages as of that date, which is what makes every
  * remaining mirror source a real repoint candidate rather than only the
  * three that used to qualify. `unmatchedRepointSpecs` enforces that every row
  * here also names a `MIRROR_SPECS` row with the same `repository` and `file`.
@@ -160,10 +159,10 @@ export type RepointSpec = {
  * Several of these are EXPECTED TO FAIL the actual repoint compile, and that
  * is the point of running the gate rather than a reason to omit the row:
  * `block-vocabulary.ts` restates `resistsNormalExplosion`, which kernel does
- * not export (appendix E.4: "kernel PR"); `position-key.ts` and
- * `block-position-key.ts` export everything under names kernel does not use
- * (`positionKeyOf`, `below`, `above`, ... — appendix K). `check:repoint`
- * pastes the diagnostics; W1-M0 does not fix them.
+ * not export and needs its own upstream addition first; `position-key.ts`
+ * and `block-position-key.ts` export everything under names kernel does not
+ * use (`positionKeyOf`, `below`, `above`, ...). `check:repoint` pastes the
+ * diagnostics; this change does not fix them.
  */
 export const REPOINT_SPECS: ReadonlyArray<RepointSpec> = [
   {

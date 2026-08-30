@@ -108,8 +108,8 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 `mx-gameplay` が直接依存するため、ローカルの ChunkStore ミラーは残さない:
 
 実在するミラー（`MIRROR_SPECS`、2026-08-30 に各リポジトリの `origin/main` へ再照合。
-`mc-compose` の `kernel-vocabulary.ts` は同日 W1-M1 相当の作業が先に upstream で
-merge され、削除済み）:
+`mc-compose` の `kernel-vocabulary.ts` は同日それより前に、repoint 済みの commit が
+upstream で merge され、削除済み）:
 
 | ミラー | 置き場所 | ミラー元 |
 | --- | --- | --- |
@@ -119,7 +119,7 @@ merge され、削除済み）:
 | `src/domain/chunk-store-port.ts` | mx-gameplay | mc-worldgen |
 | `src/domain/portal-frame-port.ts` | mx-gameplay | mc-worldgen |
 | `src/domain/item-vocabulary.ts`（既に 2 行の re-export） | mx-gameplay | mc-kernel |
-| `src/domain/position-key.ts` / `block-position-key.ts`（ヘッダに mirror 表記なし。付録 K の判断で登録） | mx-gameplay | mc-kernel |
+| `src/domain/position-key.ts` / `block-position-key.ts`（ヘッダに mirror 表記はないが、kernel の `coordinate-keys.ts` と同じ概念を別名で持つ二重実装） | mx-gameplay | mc-kernel |
 
 各リポジトリには `*-mirror.test.ts` があり、形と `Context.Tag` のキーを両方向に pin している。
 **それは「書き写した結果」を pin しているのであって、「書き写し元」ではない。**

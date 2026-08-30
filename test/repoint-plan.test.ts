@@ -95,7 +95,7 @@ describe('REPOINT_SPECS', () => {
 
   /*
    * `mx-gameplay/domain/inventory-port.ts` is the row this test used to pin —
-   * it no longer exists on any repository's `origin/main` (W1-M0,
+   * it no longer exists on any repository's `origin/main` (checked
    * 2026-08-30) and was removed from both `REPOINT_SPECS` and
    * `MIRROR_SPECS`. See the note above `REPOINT_SPECS` in
    * domain/repoint-plan.ts for the full re-derivation.

@@ -225,14 +225,13 @@ kernel 自身の audit §4.9.1(d) がこの規則を既に書いている —
 | `mc-worldgen` の mc-kernel 直接依存（`pnpm check:portable`） | `opacityOfBlockId` | `opacity` |
 | `mc-worldgen` の mc-kernel 直接依存（`pnpm check:portable`） | `lightEmissionOfBlockId` | `lightEmission` |
 
-**mirror probe（capability / property 列）は W1-M0（2026-08-30）で全行削除した。**
+**mirror probe（capability / property 列）は 2026-08-30 に全行削除した。**
 `mx-gameplay/domain/block-vocabulary.ts` の `supportRuleOfBlockId`（`supportRule` 列）を含む
-すべての probe 行が対象で、`~/Desktop/minecraft.md` 付録 K 最終行の判断による
-（probe は「第三のリポジトリが所有する述語」を名指す仕組みで、その所有の主張自体は
-検査されていなかった）。この節が上で説明している probe の**設計原則**は
-`capabilityOfBlockId` / `propertyOfBlockId` を使う限り引き続き正しいが、
+すべての probe 行が対象である。probe は「第三のリポジトリが所有する述語」を名指す仕組みで、
+その所有の主張自体は検査されていなかったため。この節が上で説明している probe の
+**設計原則**は `capabilityOfBlockId` / `propertyOfBlockId` を使う限り引き続き正しいが、
 現時点で実際にその原則を適用している行は `MIRROR_SPECS` に無い。
-`block-vocabulary.ts` は W1-M4 で削除される予定のミラーで、削除までの間、
+`block-vocabulary.ts` は将来削除される予定のミラーで、削除までの間、
 probe を持たない状態では `fallsWhenUnsupported` / `isReplaceable` / `validSpawnSurface` /
 `canSupportAttachments` / `supportRuleOfBlockId` は素の名前比較に落ち、
 kernel の barrel はそれらをその名前でエクスポートしていないため

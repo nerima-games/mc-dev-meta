@@ -239,7 +239,7 @@ describe('the registry itself', () => {
   /*
    * mx-gameplay's `domain/inventory-port.ts` (source mc-sim) is what the
    * comment this replaced described — it no longer exists on any
-   * repository's `origin/main` (W1-M0, 2026-08-30) and was removed from
+   * repository's `origin/main` (checked 2026-08-30) and was removed from
    * `MIRROR_SPECS` along with the file. See the note above `MIRROR_SPECS`
    * in domain/mirror-contract.ts for the full removed-row list.
    */
@@ -711,10 +711,10 @@ describe('the property probes the registry actually carries', () => {
     expect(specFor('mc-worldgen', 'domain/kernel-vocabulary.ts')).toBeUndefined()
   })
 
-  // W1-M0 (2026-08-30, appendix K's last row) removed every capability and
-  // property probe workspace-wide, including the supportRule probe this test
-  // used to pin here — see the note above this mx-gameplay row in
-  // domain/mirror-contract.ts for what that trades away and why.
+  // 2026-08-30 removed every capability and property probe workspace-wide,
+  // including the supportRule probe this test used to pin here — see the
+  // note above this mx-gameplay row in domain/mirror-contract.ts for what
+  // that trades away and why.
   it('no longer probes any property on the mx-gameplay block-vocabulary mirror', () => {
     const gameplay = specFor('mx-gameplay', 'src/domain/block-vocabulary.ts')
 
