@@ -124,8 +124,8 @@ const lightProbeLevel = (voxel: number): number => {
 }
 
 const compareKernel = async (): Promise<void> => {
-  const coordinates = await loadModule('mc-kernel coordinates', 'repos/mc-kernel/domain/coordinates.ts')
-  const registry = await loadModule('mc-kernel block registry', 'repos/mc-kernel/domain/block-registry.ts')
+  const coordinates = await loadModule('mc-kernel coordinates', 'repos/mc-kernel/src/domain/coordinates.ts')
+  const registry = await loadModule('mc-kernel block registry', 'repos/mc-kernel/src/domain/block-registry.ts')
   if (coordinates !== undefined) {
     equalNumber(
       'mc-kernel CHUNK_SIZE_XZ',
@@ -165,7 +165,7 @@ const compareKernel = async (): Promise<void> => {
 }
 
 const compareWorldgen = async (): Promise<void> => {
-  const constants = await loadModule('mc-worldgen constants', 'repos/mc-worldgen/domain/constants.ts')
+  const constants = await loadModule('mc-worldgen constants', 'repos/mc-worldgen/src/domain/constants.ts')
   if (constants === undefined) {
     return
   }
@@ -211,14 +211,14 @@ const compareWorldgen = async (): Promise<void> => {
 }
 
 const compareWorldgenLight = async (): Promise<void> => {
-  const light = await loadModule('mc-worldgen light storage', 'repos/mc-worldgen/domain/light.ts')
+  const light = await loadModule('mc-worldgen light storage', 'repos/mc-worldgen/src/domain/light.ts')
   if (light === undefined) {
     return
   }
 
   const kernelProperties = await loadModule(
     'mc-kernel light properties',
-    'repos/mc-kernel/domain/block-properties.ts',
+    'repos/mc-kernel/src/domain/block-properties.ts',
   )
   if (kernelProperties !== undefined) {
     equalNumber(

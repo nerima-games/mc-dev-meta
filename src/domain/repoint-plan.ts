@@ -141,28 +141,45 @@ export type RepointSpec = {
  * a compiler. mx-gameplay declines the divergence and transcribes the brand;
  * this row is what makes the declining checkable.
  */
+/**
+ * `file` is repo-relative and ALWAYS includes the `src/` prefix, for the same
+ * reason `MirrorSpec.file` does (see the note above `MIRROR_SPECS` in
+ * domain/mirror-contract.ts): `check-repoint.ts` joins this against
+ * `repos/<repository>/` and inserts nothing itself.
+ *
+ * Re-derived alongside `MIRROR_SPECS` on 2026-08-30, to the same ten files:
+ * `mx-gameplay/inventory-port.ts` and `mx-redstone/frame-contract.ts` are
+ * gone (neither exists on `origin/main`; see the removed-rows note in
+ * `domain/mirror-contract.ts`), and mc-kernel, mc-meshing and mc-worldgen are
+ * all published packages as of that date, which is what makes every
+ * remaining mirror source a real repoint candidate rather than only the
+ * three that used to qualify. `unmatchedRepointSpecs` enforces that every row
+ * here also names a `MIRROR_SPECS` row with the same `repository` and `file`.
+ *
+ * Several of these are EXPECTED TO FAIL the actual repoint compile, and that
+ * is the point of running the gate rather than a reason to omit the row:
+ * `block-vocabulary.ts` restates `resistsNormalExplosion`, which kernel does
+ * not export and needs its own upstream addition first; `position-key.ts`
+ * and `block-position-key.ts` export everything under names kernel does not
+ * use (`positionKeyOf`, `below`, `above`, ...). `check:repoint` pastes the
+ * diagnostics; this change does not fix them.
+ */
 export const REPOINT_SPECS: ReadonlyArray<RepointSpec> = [
   {
     repository: 'mx-gameplay',
-    file: 'domain/frame-contract.ts',
+    file: 'src/domain/frame-contract.ts',
     packageName: '@nerima-games/mc-kernel',
     source: 'mc-kernel',
   },
   {
-    repository: 'mx-gameplay',
-    file: 'domain/inventory-port.ts',
-    packageName: '@nerima-games/mc-sim',
-    source: 'mc-sim',
+    repository: 'mx-multiplayer',
+    file: 'src/domain/frame-contract.ts',
+    packageName: '@nerima-games/mc-kernel',
+    source: 'mc-kernel',
   },
   {
     repository: 'mx-ui',
-    file: 'domain/frame-contract.ts',
-    packageName: '@nerima-games/mc-kernel',
-    source: 'mc-kernel',
-  },
-  {
-    repository: 'mx-redstone',
-    file: 'domain/frame-contract.ts',
+    file: 'src/domain/frame-contract.ts',
     packageName: '@nerima-games/mc-kernel',
     source: 'mc-kernel',
   },
@@ -192,9 +209,45 @@ export const REPOINT_SPECS: ReadonlyArray<RepointSpec> = [
     // names and optionality, not member types. Only a compiler resolving both
     // against the real module notices, which is this gate.
     repository: 'mc-render',
-    file: 'domain/lod-vocabulary.ts',
+    file: 'src/domain/lod-vocabulary.ts',
     packageName: '@nerima-games/mc-meshing',
     source: 'mc-meshing',
+  },
+  {
+    repository: 'mx-gameplay',
+    file: 'src/domain/block-vocabulary.ts',
+    packageName: '@nerima-games/mc-kernel',
+    source: 'mc-kernel',
+  },
+  {
+    repository: 'mx-gameplay',
+    file: 'src/domain/chunk-store-port.ts',
+    packageName: '@nerima-games/mc-worldgen',
+    source: 'mc-worldgen',
+  },
+  {
+    repository: 'mx-gameplay',
+    file: 'src/domain/portal-frame-port.ts',
+    packageName: '@nerima-games/mc-worldgen',
+    source: 'mc-worldgen',
+  },
+  {
+    repository: 'mx-gameplay',
+    file: 'src/domain/item-vocabulary.ts',
+    packageName: '@nerima-games/mc-kernel',
+    source: 'mc-kernel',
+  },
+  {
+    repository: 'mx-gameplay',
+    file: 'src/domain/position-key.ts',
+    packageName: '@nerima-games/mc-kernel',
+    source: 'mc-kernel',
+  },
+  {
+    repository: 'mx-gameplay',
+    file: 'src/domain/block-position-key.ts',
+    packageName: '@nerima-games/mc-kernel',
+    source: 'mc-kernel',
   },
 ]
 

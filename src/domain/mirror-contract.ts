@@ -226,19 +226,63 @@ export type MirrorSpec = {
  * reports any spec whose file has vanished (which is what DELETING a mirror
  * looks like, and is the signal to delete its row here too).
  */
+/**
+ * `file` is repo-relative and ALWAYS includes the `src/` prefix — every
+ * repository in the workspace keeps its source under `src/`, and every
+ * resolver that joins this against `repos/<repository>/` (`scripts/
+ * check-mirrors.ts`, `scripts/check-repoint.ts`) assumes that and inserts
+ * nothing itself. A path here without `src/` used to resolve to a file that
+ * does not exist and read as "no longer exists" rather than as the path bug
+ * it was.
+ *
+ * This list was re-derived against each repository's `origin/main` on
+ * 2026-08-30 (`pnpm sync:latest`, not the pinned `repos.json` — see
+ * docs/manifest.md §3 `--latest`), by listing `src/**\/*-vocabulary.ts`,
+ * `*-contract.ts`, `*-port.ts` in every repository and keeping only files
+ * whose header identifies them as a provisional restatement of a sibling
+ * repository's declarations, scheduled for deletion once that sibling
+ * publishes. Seven rows that used to be here named files that do not exist on
+ * any repository's `origin/main` and were removed: mc-render and
+ * mc-playground-kit's `kernel-vocabulary.ts`, mc-compose's
+ * `kernel-vocabulary.ts` (repointed already — see below), mx-gameplay's
+ * `inventory-port.ts`, mx-redstone's `frame-contract.ts`, mc-worldgen's
+ * `save-format-port.ts`, and mc-sim's `worldgen-vocabulary.ts`.
+ *
+ * mc-compose's `src/domain/kernel-vocabulary.ts` is not a "does not exist
+ * yet" absence like the other six: `git log --oneline -- '*kernel-vocabulary*'`
+ * in the synced clone shows it was deleted by `f3228cb refactor(compose):
+ * adopt published kernel vocabulary` / `5095128 feat: integrate published
+ * kernel vocabulary and session boundary`, merged into `origin/main` today
+ * (2026-08-30) via `rescue/local-main-20260830-signed`. `package.json`
+ * already pins `@nerima-games/mc-kernel@0.4.0` as a real dependency. This
+ * means mc-compose's mirror was repointed upstream before this change landed
+ * — mc-compose is not one of the ten rows below, and any downstream task
+ * still planning to repoint it should re-check the tree first.
+ *
+ * `mx-gameplay/src/domain/position-key.ts` and `block-position-key.ts` are
+ * the two rows in this list whose registration is a judgment call rather
+ * than a header match: unlike every other row, NEITHER file's header says
+ * "mirror" or "restated" or "scheduled for deletion" — `position-key.ts`'s
+ * only doc comment is "Canonical coordinate key for gameplay work queues",
+ * and `block-position-key.ts` already imports `adjacentBlockPosition`,
+ * `blockPosition` and `horizontalBlockNeighbours` from the PUBLISHED
+ * `@nerima-games/mc-kernel` for part of its own implementation. Diffing
+ * against kernel's `coordinate-keys.ts` shows it carries the same concept
+ * under different names (`positionKeyOf` → `blockPositionKeyOf`,
+ * `below`/`above` → `adjacentBlockPosition`, `horizontalNeighbours` →
+ * `horizontalBlockNeighbours`), so both files are a duplicate implementation
+ * that should be deleted in favour of the kernel functions. They are
+ * included here on that basis, not on the header test the rest of this list
+ * uses — `compareValues` has no rename mechanism for VALUES (only
+ * `MirrorSpec.renamedTypes`, and only for types), so every renamed function
+ * will read as `SymbolNotPublished` against kernel's barrel. That is a real,
+ * reportable difference this row is expected to surface, not a defect in
+ * this registry.
+ */
 export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
   {
     repository: 'mc-render',
-    file: 'domain/kernel-vocabulary.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    repository: 'mc-render',
-    file: 'domain/lod-vocabulary.ts',
+    file: 'src/domain/lod-vocabulary.ts',
     source: 'mc-meshing',
     // NOTHING IS RENAMED, and for this mirror that is load-bearing rather than
     // incidental. `LOD_LEVELS`, `LodLevel`, `LodLevelSchema`, `STEP_FOR_LOD` and
@@ -259,26 +303,8 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     rosters: [],
   },
   {
-    repository: 'mc-playground-kit',
-    file: 'domain/kernel-vocabulary.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    repository: 'mc-compose',
-    file: 'domain/kernel-vocabulary.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
     repository: 'mx-gameplay',
-    file: 'domain/frame-contract.ts',
+    file: 'src/domain/frame-contract.ts',
     source: 'mc-kernel',
     renamedTypes: [],
     capabilities: [],
@@ -286,17 +312,8 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     rosters: [],
   },
   {
-    repository: 'mx-gameplay',
-    file: 'domain/inventory-port.ts',
-    source: 'mc-sim',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    repository: 'mx-redstone',
-    file: 'domain/frame-contract.ts',
+    repository: 'mx-multiplayer',
+    file: 'src/domain/frame-contract.ts',
     source: 'mc-kernel',
     renamedTypes: [],
     capabilities: [],
@@ -305,7 +322,7 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
   },
   {
     repository: 'mx-ui',
-    file: 'domain/frame-contract.ts',
+    file: 'src/domain/frame-contract.ts',
     source: 'mc-kernel',
     renamedTypes: [],
     capabilities: [],
@@ -313,152 +330,105 @@ export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
     rosters: [],
   },
   {
+    // Four capability probes (fallsWhenUnsupported, isReplaceable,
+    // validSpawnSurface, canSupportAttachments) and one property probe
+    // (supportRuleOfBlockId/supportRule) lived here and caught two real
+    // defects (a missing `isReplaceable` id, and `validSpawnSurface`
+    // disagreeing on oak_log). They were removed on 2026-08-30 along with
+    // every other capability/property probe in this file: a probe row is
+    // ALSO an ownership claim that was never itself checked (see the git
+    // history of this file for the incident that motivated the original
+    // probes), and the mirror they probe is itself scheduled for deletion.
+    // Removing them trades away real coverage for a file that still exists
+    // today: without a capability probe, `fallsWhenUnsupported`,
+    // `isReplaceable`, `validSpawnSurface` and `canSupportAttachments` fall
+    // through to the plain by-name comparison, and kernel does not export
+    // any of the four under that name (they live behind
+    // `capabilityOfBlockId`) — so `pnpm check:mirrors` is expected to report
+    // `SymbolNotPublished` for all four, plus for `supportRuleOfBlockId`,
+    // until this file is deleted.
     repository: 'mx-gameplay',
-    file: 'domain/block-vocabulary.ts',
+    file: 'src/domain/block-vocabulary.ts',
     source: 'mc-kernel',
     renamedTypes: [],
-    capabilities: [
-      { mirrorExport: 'fallsWhenUnsupported', owner: 'mc-kernel', capability: 'fallsWhenUnsupported' },
-      { mirrorExport: 'isReplaceable', owner: 'mc-kernel', capability: 'replaceable' },
-      // Added after a drift the list could not see. The mirror restates kernel's
-      // capabilities and only two were probed, so `NON_SPAWN_SURFACE_IDS` was
-      // free to disagree with kernel — and did, on `oak_log`, in both
-      // repositories at once.
-      //
-      // The lesson is about the shape of this array rather than about one id: a
-      // probe list shorter than the set of capabilities a mirror restates
-      // reports success it has not checked, which is the failure mode this
-      // file's own header calls "worse than no checker".
-      //
-      // Note this one is a NEGATIVE set on both sides (kernel defaults it to
-      // `true`); the probe compares the accepted sets over every representable
-      // id, so the polarity is handled by evaluation rather than by convention.
-      { mirrorExport: 'validSpawnSurface', owner: 'mc-kernel', capability: 'validSpawnSurface' },
-      // The fourth, and the one whose ABSENCE from this array is what exposed
-      // the structural defect. See the note below.
-      { mirrorExport: 'canSupportAttachments', owner: 'mc-kernel', capability: 'canSupportAttachments' },
-    ],
-    // The SECOND mirror to carry property data, and it was not obvious from the
-    // outside: this file's four capability probes make it look like the flag
-    // mirror, but `SUPPORT_RULE_OVERRIDES` is twenty hand-written rows of
-    // kernel's `supportRule` COLUMN — a property, in the same table as `opacity`
-    // and read through the same `propertyOfBlockId`.
-    //
-    // It is the highest-consequence property in the table for this repository,
-    // because `canBlockStaySupported` joins it against `canSupportAttachments`
-    // and the file's own header records that THE PRECEDENCE IS THE PART THAT
-    // GOES WRONG — the per-block rule wins over the negative set, so a stale row
-    // here does not merely misplace one block, it silently reorders the two
-    // rules for it. That is why the row exists even though the column happens to
-    // agree today: a probe added while a table is correct is the only kind that
-    // was never written to match a table already known to be wrong.
-    //
-    // A struct-valued column, so the readings are compared as rendered JSON.
-    // `isSupportSensitiveBlockId` is left unprobed on the `transmitsLight`
-    // reasoning above: it is `isSupportSensitive(supportRuleOfBlockId(id))` on
-    // both sides and cannot disagree on its own.
-    properties: [
-      { mirrorExport: 'supportRuleOfBlockId', owner: 'mc-kernel', property: 'supportRule' },
-    ],
-    rosters: [],
-  },
-  {
-    // The FOURTH source repository this list has ever pointed at — mc-kernel,
-    // mc-worldgen and mc-sim were the other three — and the first mirror of
-    // mc-save anywhere in the organisation.
-    //
-    // It is worth saying why it did not exist until now, because the reason was
-    // not technical. mc-worldgen's `docs/responsibility.md` §1-5 recorded the
-    // chunk format as 「⬜ publish 待ち」 and justified it with 「import できない
-    // 理由は `domain/kernel-vocabulary.ts` と同じ」 — a sentence that is true and
-    // refutes its own conclusion, since `kernel-vocabulary.ts` is not a file
-    // that waited for a publish, it is the file that made waiting unnecessary.
-    // The blocker was a missing mirror, and the row below is what makes the
-    // replacement mirror checkable rather than merely present.
-    repository: 'mc-worldgen',
-    file: 'domain/save-format-port.ts',
-    source: 'mc-save',
-    // NOTHING is renamed, and this gate is what checks that rather than a note.
-    // The mirror's header records the rule the organisation paid for: a mirror
-    // that renames a symbol typechecks, passes every local test, and yields a
-    // name that does not exist on repoint day.
-    renamedTypes: [],
-    // EMPTY AND CORRECT. mc-save owns no block table and no capability flags —
-    // it is deliberately ignorant of what is being saved (`mc-save/index.ts`:
-    // 「no opinion about what is being saved」). A probe row here would be the
-    // misplacement the note under this list records, and it would additionally
-    // exempt its symbol from the "is it on the source's barrel?" check, which is
-    // the strongest thing this row has.
     capabilities: [],
-    // Empty for the same reason: no property column exists to compare.
     properties: [],
     rosters: [],
-    // -----------------------------------------------------------------------
-    // THIS ROW'S BLIND SPOT, recorded because the row above looks complete.
-    // -----------------------------------------------------------------------
-    //
-    // The mirror exports `SaveEnvelopeSchema`, and a `Schema` is neither a
-    // scalar, a tag, nor a `Brand.refined` constructor — so `observeValue` in
-    // `scripts/check-mirrors.ts` reduces it to `Opaque{kind:'object'}`. This
-    // gate therefore compares "both sides export an object called
-    // SaveEnvelopeSchema" and NOTHING about the refinements inside it. mc-save
-    // constrains the format name with `minLength(1)` and the version with
-    // `int()` and `greaterThanOrEqualTo(FIRST_VERSION)`; a mirror that kept the
-    // three field names and dropped all three refinements would be reported as
-    // agreement here.
-    //
-    // That is the same shape as the `ITEM_TYPES` roster blind spot recorded on
-    // mc-sim's row — kernel's audit §4.9.1(d), 「ミラーが転記している能力の数より
-    // probe が少なければ、そのチェックは検査していない成功を報告する」 — with
-    // `capability` replaced by `refinement`. A `Schema` is not a `Brand.refined`
-    // constructor, so the existing `Refinement` observation cannot reach it; the
-    // fix would be a fourth probe kind (decode a fixed sample grid through both
-    // schemas and compare the accept/reject vectors, exactly as
-    // `REFINEMENT_SAMPLES` does for brands), and it is deliberately NOT
-    // attempted in the change that adds this mirror, because it alters
-    // `MirrorSpec` for all twelve specs.
-    //
-    // Until it exists, `mc-worldgen/test/save-format-mirror.test.ts` SF-3 pins
-    // the three refinements from inside mc-worldgen. That is the weaker
-    // guarantee — a test the mirroring repository could edit in the same commit
-    // that breaks it — and this row should not be read as covering it.
-    //
-    // The `FIRST_VERSION = 1` scalar IS compared for real, and it is the one
-    // value on this mirror that a drift cannot survive.
   },
   {
-    repository: 'mc-sim',
-    file: 'domain/worldgen-vocabulary.ts',
+    // `ChunkStore` and its supporting types, restated because mc-worldgen is a
+    // legitimate `dependencies` edge (plan.md §2.1) that is simply not
+    // published yet — see the file's own header. Source is mc-worldgen, not
+    // mc-kernel, even though `BlockId`/`BlockPosition`/`ChunkCoord` in the same
+    // file come from kernel's vocabulary: this row's `source` names the
+    // repository whose BARREL the file will be deleted in favour of, which is
+    // mc-worldgen for `ChunkStore` itself.
+    repository: 'mx-gameplay',
+    file: 'src/domain/chunk-store-port.ts',
     source: 'mc-worldgen',
     renamedTypes: [],
     capabilities: [],
     properties: [],
     rosters: [],
-    // THE FIRST ROW IN THIS LIST WHOSE MIRROR IS A CLOSED UNION AND NOTHING
-    // ELSE, and the blind spot recorded on mc-sim's `kernel-vocabulary` row
-    // applies to it in full rather than in part.
-    //
-    // This mirror carries exactly one declaration — `Dimension`, a three-member
-    // literal union — and MEMBERSHIP IS THE TYPE. Neither probe kind reads a
-    // union's members: `observeValue` in `scripts/check-mirrors.ts` cannot see a
-    // type at all, and a type-only module exports no runtime value for it to
-    // compare. So this row asserts that the FILE EXISTS and that its source
-    // repository is mc-worldgen, and it asserts nothing whatever about whether
-    // the union still has three members or the same three.
-    //
-    // That is the roster blind spot mc-sim's other row paid seventy-four missing
-    // literals for, and the row is added anyway for the reason that one gives:
-    // a mirror ABSENT from this list is a mirror `scripts/check-mirrors.ts` will
-    // not even report as vanished, and `check:repoint` — which is what actually
-    // caught the `ITEM_TYPES` drift, by deleting the mirror and typechecking
-    // against the real module — reads `REPOINT_SPECS` against this list and
-    // rejects any repoint spec naming a mirror `MIRROR_SPECS` has never heard
-    // of. Registering it is what makes the stronger gate able to see it.
-    //
-    // Until the roster probe exists, `mc-sim/test/worldgen-mirror.test.ts` pins
-    // the three members from inside mc-sim. That is the weaker guarantee — a
-    // test the mirroring repository could edit in the same commit that breaks it
-    // — and this row should not be read as covering it.
+  },
+  {
+    // `PROVISIONAL LOCAL MIRROR of @nerima-games/mc-worldgen's
+    // domain/portal-frame.ts` per the file's own header. mc-kernel also
+    // carries an export-identical `src/domain/portal-frame.ts`, and a diff of
+    // the two shows kernel as the canonical version for the EVENTUAL repoint
+    // — but that is a decision about where the future import points, not
+    // about what this file currently declares itself to mirror, so `source`
+    // stays `mc-worldgen` here, matching the header.
+    repository: 'mx-gameplay',
+    file: 'src/domain/portal-frame-port.ts',
+    source: 'mc-worldgen',
+    renamedTypes: [],
+    capabilities: [],
+    properties: [],
+    rosters: [],
+  },
+  {
+    // Already a two-line re-export from the published `@nerima-games/mc-kernel`
+    // rather than a hand-transcription — mid-migration, not yet deleted. Kept
+    // as a row because a live spec is what makes `check:mirrors` notice when
+    // the file is finally deleted, and it is tracked for removal along with
+    // the other kernel mirrors in this repository.
+    repository: 'mx-gameplay',
+    file: 'src/domain/item-vocabulary.ts',
+    source: 'mc-kernel',
+    renamedTypes: [],
+    capabilities: [],
+    properties: [],
+    rosters: [],
+  },
+  {
+    // See the note above `MIRROR_SPECS`: no "mirror/restated" header, included
+    // on the strength of its duplicate relationship with kernel's
+    // `coordinate-keys.ts` rather than this file's own claim. Expect
+    // `SymbolNotPublished` findings for every renamed export
+    // (`positionKeyOf`, `positionOfKey` — this file's own two exports).
+    repository: 'mx-gameplay',
+    file: 'src/domain/position-key.ts',
+    source: 'mc-kernel',
+    renamedTypes: [],
+    capabilities: [],
+    properties: [],
+    rosters: [],
+  },
+  {
+    // See the note above `MIRROR_SPECS`. This file's exports
+    // (`positionKeyOf`, `positionOfKey`, `below`, `above`, `horizontalNeighbours`)
+    // are ALL renamed relative to kernel's `coordinate-keys.ts` /
+    // `coordinate-neighbours.ts`, so every one is expected to read as
+    // `SymbolNotPublished` until this file is deleted and callers are
+    // repointed at the kernel functions directly.
+    repository: 'mx-gameplay',
+    file: 'src/domain/block-position-key.ts',
+    source: 'mc-kernel',
+    renamedTypes: [],
+    capabilities: [],
+    properties: [],
+    rosters: [],
   },
 ]
 

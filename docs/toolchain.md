@@ -99,8 +99,8 @@ check:pins: 14 in policy, 1 of 15 out of policy, 1 finding(s) total.
 
 ## 6. 何を変えないか
 
-- `mc-compose` は `package:verify` / `dist` の形から例外扱いされる
-  (plan.md 付録 C)が、toolchain 検査からは例外ではない。両チェックとも
+- `mc-compose` は dist を持たず `package:verify` / `dist` の形の検査からは
+  例外扱いされるが、toolchain 検査からは例外ではない。両チェックとも
   `mc-compose` を他の 14 リポジトリと同じ規則で監査する
 - `mc-dev-meta` 自身は 15 リポジトリに含まれない
   (`domain/repository-roster.ts#MANAGED_REPOSITORY_NAMES`)ので、

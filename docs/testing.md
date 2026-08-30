@@ -218,13 +218,26 @@ kernel 自身の audit §4.9.1(d) がこの規則を既に書いている —
 「ミラーが転記している能力の数より probe が少なければ、そのチェックは検査していない成功を報告する」。
 **プロパティ probe が 0 件の配列は、その文の極限形である。**
 
-現在、mirror probe と portable 契約が監視している列:
+現在、portable 契約が監視している列:
 
 | 契約 | export | 列 |
 | --- | --- | --- |
 | `mc-worldgen` の mc-kernel 直接依存（`pnpm check:portable`） | `opacityOfBlockId` | `opacity` |
 | `mc-worldgen` の mc-kernel 直接依存（`pnpm check:portable`） | `lightEmissionOfBlockId` | `lightEmission` |
-| `mx-gameplay/domain/block-vocabulary.ts` の mirror probe | `supportRuleOfBlockId` | `supportRule` |
+
+**mirror probe（capability / property 列）は 2026-08-30 に全行削除した。**
+`mx-gameplay/domain/block-vocabulary.ts` の `supportRuleOfBlockId`（`supportRule` 列）を含む
+すべての probe 行が対象である。probe は「第三のリポジトリが所有する述語」を名指す仕組みで、
+その所有の主張自体は検査されていなかったため。この節が上で説明している probe の
+**設計原則**は `capabilityOfBlockId` / `propertyOfBlockId` を使う限り引き続き正しいが、
+現時点で実際にその原則を適用している行は `MIRROR_SPECS` に無い。
+`block-vocabulary.ts` は将来削除される予定のミラーで、削除までの間、
+probe を持たない状態では `fallsWhenUnsupported` / `isReplaceable` / `validSpawnSurface` /
+`canSupportAttachments` / `supportRuleOfBlockId` は素の名前比較に落ち、
+kernel の barrel はそれらをその名前でエクスポートしていないため
+`pnpm check:mirrors` は `SymbolNotPublished` を報告する（API ロック撤去により
+現状は mc-kernel に committed `api-lock.md` が無く、この 1 スペックはそもそも
+`skip` になる — 下記 §6.1 と対照）。
 
 **probe は owner の id 全域を閉じて比較する**(現状 0..255)。
 ミラー側のテーブルが尽きたところで止めると、行が欠けたミラーと「一致」してしまう。

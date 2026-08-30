@@ -237,23 +237,18 @@ describe('the registry itself', () => {
   })
 
   /*
-   * The registry's first mc-sim row, and the property its comment claims.
-   *
-   * A probe row EXEMPTS its symbol from the "is it on the source's barrel?"
-   * check — that is the blindfold the note under `MIRROR_SPECS` records — and
-   * the two symbols `domain/inventory-port.ts` is most likely to grow are
-   * exactly the two mc-sim's barrel cannot hand back: `ItemType` and
-   * `StackCount`, which mc-sim mirrors from kernel and deliberately does not
-   * re-export. A probe row here would silence the finding that says so.
+   * mx-gameplay's `domain/inventory-port.ts` (source mc-sim) is what the
+   * comment this replaced described — it no longer exists on any
+   * repository's `origin/main` (checked 2026-08-30) and was removed from
+   * `MIRROR_SPECS` along with the file. See the note above `MIRROR_SPECS`
+   * in domain/mirror-contract.ts for the full removed-row list.
    */
-  it('the mc-sim inventory mirror carries no capability probe, and no rename', () => {
+  it('does not carry a row for the deleted mx-gameplay inventory-port mirror', () => {
     const inventory = MIRROR_SPECS.find(
-      (entry) => entry.repository === 'mx-gameplay' && entry.file === 'domain/inventory-port.ts',
+      (entry) => entry.repository === 'mx-gameplay' && entry.file.endsWith('inventory-port.ts'),
     )
 
-    expect(inventory?.source).toBe('mc-sim')
-    expect(inventory?.capabilities).toStrictEqual([])
-    expect(inventory?.renamedTypes).toStrictEqual([])
+    expect(inventory).toBeUndefined()
   })
 })
 
@@ -716,15 +711,15 @@ describe('the property probes the registry actually carries', () => {
     expect(specFor('mc-worldgen', 'domain/kernel-vocabulary.ts')).toBeUndefined()
   })
 
-  // The mirror that looks like the flag mirror and is not only that:
-  // SUPPORT_RULE_OVERRIDES is twenty hand-written rows of kernel's supportRule
-  // COLUMN, in the same table as opacity and read through the same accessor.
-  it('probes the supportRule column mx-gameplay mirrors', () => {
-    const gameplay = specFor('mx-gameplay', 'domain/block-vocabulary.ts')
+  // 2026-08-30 removed every capability and property probe workspace-wide,
+  // including the supportRule probe this test used to pin here — see the
+  // note above this mx-gameplay row in domain/mirror-contract.ts for what
+  // that trades away and why.
+  it('no longer probes any property on the mx-gameplay block-vocabulary mirror', () => {
+    const gameplay = specFor('mx-gameplay', 'src/domain/block-vocabulary.ts')
 
-    expect(gameplay?.properties).toStrictEqual([
-      { mirrorExport: 'supportRuleOfBlockId', owner: 'mc-kernel', property: 'supportRule' },
-    ])
+    expect(gameplay?.properties).toStrictEqual([])
+    expect(gameplay?.capabilities).toStrictEqual([])
   })
 
   /*

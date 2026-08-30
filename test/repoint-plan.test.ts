@@ -94,26 +94,18 @@ describe('REPOINT_SPECS', () => {
   })
 
   /*
-   * The second source repository this gate has ever pointed at, and the row
-   * that found a defect on its first run.
-   *
-   * `mx-gameplay/domain/inventory-port.ts` mirrors mc-sim's `InventoryService`
-   * whole — the api plus the crafting vocabulary under it — and repointing it
-   * DID NOT COMPILE, for one cause: mc-sim's own kernel mirror carries
-   * `ITEM_TYPES` at 23 literals against kernel's 97, and `ItemType` is a
-   * PARAMETER type on `add`. `pnpm check:mirrors` reports that mirror as `ok`,
-   * because a closed literal union has no members for a text comparison to
-   * read (`test/mirror-contract.test.ts` pins that blind spot). This row is
-   * what makes the difference between the two gates concrete.
+   * `mx-gameplay/domain/inventory-port.ts` is the row this test used to pin —
+   * it no longer exists on any repository's `origin/main` (checked
+   * 2026-08-30) and was removed from both `REPOINT_SPECS` and
+   * `MIRROR_SPECS`. See the note above `REPOINT_SPECS` in
+   * domain/repoint-plan.ts for the full re-derivation.
    */
-  it('carries the mc-sim inventory mirror, whose types check:mirrors cannot compare', () => {
+  it('does not carry a row for the deleted mx-gameplay inventory-port mirror', () => {
     const inventory = REPOINT_SPECS.find(
-      (candidate) =>
-        candidate.repository === 'mx-gameplay' && candidate.file === 'domain/inventory-port.ts',
+      (candidate) => candidate.repository === 'mx-gameplay' && candidate.file.endsWith('inventory-port.ts'),
     )
 
-    expect(inventory?.packageName).toBe('@nerima-games/mc-sim')
-    expect(inventory?.source).toBe('mc-sim')
+    expect(inventory).toBeUndefined()
   })
 
   it('rewrites the inventory mirror at the depth its call sites import it from', () => {
