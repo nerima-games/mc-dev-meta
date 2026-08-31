@@ -17,7 +17,7 @@ allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
   - '@nerima-games/mc-audio@0.2.7'
-  - '@nerima-games/mc-kernel@0.5.1'
+  - '@nerima-games/mc-kernel@0.5.1 || 0.6.1'
   - '@nerima-games/mc-meshing@0.1.5'
   - '@nerima-games/mc-noise@0.3.0'
   - '@nerima-games/mc-physics@0.2.1'
@@ -25,7 +25,7 @@ minimumReleaseAgeExclude:
   - '@nerima-games/mc-render@0.3.0'
   - '@nerima-games/mc-save@0.3.0'
   - '@nerima-games/mc-sim@0.2.1'
-  - '@nerima-games/mc-worldgen@0.2.0'
+  - '@nerima-games/mc-worldgen@0.2.0 || 0.3.0'
   - '@nerima-games/mx-gameplay@0.3.3'
   - '@nerima-games/mx-multiplayer@0.5.1'
   - '@nerima-games/mx-redstone@0.2.8'

@@ -703,6 +703,24 @@ describe('a property probe that read zero ids is a failure, not agreement', () =
  * simply compares less and still says `ok`. These assertions are the only thing
  * that makes removing one a visible act.
  */
+/**
+ * Every mirror Wave 1 deleted, by workspace path. A row naming any of these
+ * would be claiming to compare a file that no longer exists — which the gate
+ * reports as a skip, and a skip is exactly what a stale row hides behind.
+ */
+const DELETED_IN_WAVE_ONE: ReadonlySet<string> = new Set([
+  'mc-render/src/domain/lod-vocabulary.ts',
+  'mx-gameplay/src/domain/frame-contract.ts',
+  'mx-multiplayer/src/domain/frame-contract.ts',
+  'mx-ui/src/domain/frame-contract.ts',
+  'mx-gameplay/src/domain/block-vocabulary.ts',
+  'mx-gameplay/src/domain/chunk-store-port.ts',
+  'mx-gameplay/src/domain/portal-frame-port.ts',
+  'mx-gameplay/src/domain/item-vocabulary.ts',
+  'mx-gameplay/src/domain/position-key.ts',
+  'mx-gameplay/src/domain/block-position-key.ts',
+])
+
 describe('the property probes the registry actually carries', () => {
   const specFor = (repository: string, file: string): MirrorSpec | undefined =>
     MIRROR_SPECS.find((entry) => entry.repository === repository && entry.file === file)
@@ -711,15 +729,15 @@ describe('the property probes the registry actually carries', () => {
     expect(specFor('mc-worldgen', 'domain/kernel-vocabulary.ts')).toBeUndefined()
   })
 
-  // 2026-08-30 removed every capability and property probe workspace-wide,
-  // including the supportRule probe this test used to pin here — see the
-  // note above this mx-gameplay row in domain/mirror-contract.ts for what
-  // that trades away and why.
-  it('no longer probes any property on the mx-gameplay block-vocabulary mirror', () => {
-    const gameplay = specFor('mx-gameplay', 'src/domain/block-vocabulary.ts')
-
-    expect(gameplay?.properties).toStrictEqual([])
-    expect(gameplay?.capabilities).toStrictEqual([])
+  // The block-vocabulary probe test that stood here went with its subject:
+  // Wave 1 deleted that mirror and repointed mx-gameplay at the kernel.
+  // What replaces it is the invariant that outlives any single row — every
+  // registered mirror must be a file that exists, so a stale row can never
+  // sit here reporting agreement about something already deleted.
+  it('registers no mirror whose file has since been deleted', () => {
+    expect(
+      MIRROR_SPECS.filter((entry) => DELETED_IN_WAVE_ONE.has(`${entry.repository}/${entry.file}`)),
+    ).toStrictEqual([])
   })
 
   /*
@@ -1058,7 +1076,16 @@ describe('an empty observation is a failure, not agreement', () => {
 })
 
 describe('an absent repository is skipped, not failed', () => {
-  const skipped: ReadonlyArray<MirrorOutcome> = MIRROR_SPECS.map((entry) => ({
+  // Built from local fixtures, NOT from MIRROR_SPECS: Wave 1 emptied that
+  // registry, and deriving the skip fixture from it would quietly turn every
+  // assertion below into a test of the empty-registry path instead — the skip
+  // path would still read green while no longer being exercised at all.
+  const skippedSpecs: ReadonlyArray<MirrorSpec> = [
+    spec,
+    { ...spec, repository: 'mc-render', file: 'domain/second-synthetic-mirror.ts' },
+    { ...spec, repository: 'mx-ui', file: 'domain/third-synthetic-mirror.ts' },
+  ]
+  const skipped: ReadonlyArray<MirrorOutcome> = skippedSpecs.map((entry) => ({
     _tag: 'Skipped',
     spec: entry,
     reason: `${entry.repository} is not cloned`,
@@ -1079,6 +1106,19 @@ describe('an absent repository is skipped, not failed', () => {
     expect(report).toContain('nothing to compare')
     expect(report).toContain('This is not a failure')
     expect(report).toContain('pnpm sync')
+  })
+
+  // REGRESSION — an empty registry and an unsynced repos/ both compare zero
+  // mirrors, and they mean opposite things: finished work versus a setup step
+  // nobody ran. Telling a reader to run `pnpm sync` when the real answer is
+  // "there are no mirrors left" sends them looking for a problem that does not
+  // exist, so the two summaries must not be interchangeable.
+  it('distinguishes an empty registry from an unsynced workspace', () => {
+    const report = describeMirrorRun([]).join('\n')
+
+    expect(report).toContain('no mirrors are registered')
+    expect(report).not.toContain('pnpm sync')
+    expect(mirrorRunExitCode([])).toBe(0)
   })
 
   it('exits 0 for a partial workspace, and still reports the mirrors it did compare', () => {
