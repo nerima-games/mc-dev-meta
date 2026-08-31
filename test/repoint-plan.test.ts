@@ -20,7 +20,7 @@
  * packages and therefore cannot be bootstrapped from them.
  */
 import { describe, expect, it } from 'vitest'
-import { MIRROR_SPECS } from '../src/domain/mirror-contract'
+import { type MirrorSpec } from '../src/domain/mirror-contract'
 import {
   classifyRepoint,
   describeRepointRun,
