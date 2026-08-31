@@ -165,90 +165,10 @@ export type RepointSpec = {
  * diagnostics; this change does not fix them.
  */
 export const REPOINT_SPECS: ReadonlyArray<RepointSpec> = [
-  {
-    repository: 'mx-gameplay',
-    file: 'src/domain/frame-contract.ts',
-    packageName: '@nerima-games/mc-kernel',
-    source: 'mc-kernel',
-  },
-  {
-    repository: 'mx-multiplayer',
-    file: 'src/domain/frame-contract.ts',
-    packageName: '@nerima-games/mc-kernel',
-    source: 'mc-kernel',
-  },
-  {
-    repository: 'mx-ui',
-    file: 'src/domain/frame-contract.ts',
-    packageName: '@nerima-games/mc-kernel',
-    source: 'mc-kernel',
-  },
-  {
-    // THE THIRD SOURCE REPOSITORY, and the first mirror registered here in the
-    // same change that created it. That ordering is the point.
-    //
-    // This gate's own record says why: `inventory-port.ts` landed with
-    // shape tests in both directions, was green locally, and then failed
-    // repoint on eleven declarations the day it was added. The lesson taken
-    // from that was not "write more shape tests" — `check:mirrors` compares
-    // names and optionality by design, so the shape was never the thing in
-    // doubt. It was that a mirror's header makes a claim ("delete this file
-    // and repoint the import and it still compiles") which only this gate
-    // evaluates, and an unregistered mirror makes that claim unchecked.
-    //
-    // `lod-vocabulary.ts` is a SMALL mirror — four values and one type — and
-    // that is exactly why it is worth registering immediately rather than
-    // "when the list is next revised". A small mirror is the one nobody expects
-    // to fail, so it is the one that would sit unregistered longest.
-    //
-    // Its particular hazard is `STEP_FOR_LOD`, whose type is
-    // `Readonly<Record<LodLevel, number>>`. `LodLevel` is mirrored on this side
-    // too, so the record's KEY type is a local declaration standing in for
-    // mc-meshing's. `check:mirrors` compares the two tables by value and would
-    // pass even if the key unions differed — and domain/type-shape.ts compares
-    // names and optionality, not member types. Only a compiler resolving both
-    // against the real module notices, which is this gate.
-    repository: 'mc-render',
-    file: 'src/domain/lod-vocabulary.ts',
-    packageName: '@nerima-games/mc-meshing',
-    source: 'mc-meshing',
-  },
-  {
-    repository: 'mx-gameplay',
-    file: 'src/domain/block-vocabulary.ts',
-    packageName: '@nerima-games/mc-kernel',
-    source: 'mc-kernel',
-  },
-  {
-    repository: 'mx-gameplay',
-    file: 'src/domain/chunk-store-port.ts',
-    packageName: '@nerima-games/mc-worldgen',
-    source: 'mc-worldgen',
-  },
-  {
-    repository: 'mx-gameplay',
-    file: 'src/domain/portal-frame-port.ts',
-    packageName: '@nerima-games/mc-worldgen',
-    source: 'mc-worldgen',
-  },
-  {
-    repository: 'mx-gameplay',
-    file: 'src/domain/item-vocabulary.ts',
-    packageName: '@nerima-games/mc-kernel',
-    source: 'mc-kernel',
-  },
-  {
-    repository: 'mx-gameplay',
-    file: 'src/domain/position-key.ts',
-    packageName: '@nerima-games/mc-kernel',
-    source: 'mc-kernel',
-  },
-  {
-    repository: 'mx-gameplay',
-    file: 'src/domain/block-position-key.ts',
-    packageName: '@nerima-games/mc-kernel',
-    source: 'mc-kernel',
-  },
+  // Empty since Wave 1: every mirror is deleted and repointed for real, so
+  // there is no dry-run left to perform. The machinery stays for the next
+  // mirror; `describeRepointRun` says plainly when the registry is empty
+  // rather than reporting a vacuous success.
 ]
 
 /** Where in the workspace a repoint's mirror lives, for messages. */
@@ -729,7 +649,16 @@ export const describeRepointRun = (
   const skipped = outcomes.filter((outcome) => outcome._tag === 'Skipped')
   const lines: Array<string> = []
 
-  if (attempted.length === 0) {
+  if (outcomes.length === 0) {
+    // Same distinction `describeMirrorRun` draws: an empty registry is
+    // finished work, an unsynced `repos/` is a missing setup step, and a
+    // summary that cannot tell them apart is worth nothing.
+    lines.push(
+      'check:repoint: no repoints are registered — REPOINT_SPECS is empty, so there is nothing to attempt.',
+      'This is the post-Wave-1 steady state: every mirror was deleted and its imports repointed',
+      'for real, which is what this dry run existed to prove was possible.',
+    )
+  } else if (attempted.length === 0) {
     lines.push(
       `check:repoint: nothing to repoint — 0 of ${String(outcomes.length)} could be attempted.`,
       'This is not a failure. repos/ is gitignored, so a fresh clone has nothing in it; run',

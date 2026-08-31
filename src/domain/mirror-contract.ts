@@ -280,156 +280,11 @@ export type MirrorSpec = {
  * this registry.
  */
 export const MIRROR_SPECS: ReadonlyArray<MirrorSpec> = [
-  {
-    repository: 'mc-render',
-    file: 'src/domain/lod-vocabulary.ts',
-    source: 'mc-meshing',
-    // NOTHING IS RENAMED, and for this mirror that is load-bearing rather than
-    // incidental. `LOD_LEVELS`, `LodLevel`, `LodLevelSchema`, `STEP_FOR_LOD` and
-    // `CHUNK_SIZE` all keep mc-meshing's spelling. The rule the organisation
-    // learned from `isSupportSensitiveRule`: a renamed mirror type-checks,
-    // passes every test, matches on shape, and fails on the one day the import
-    // is repointed — because the name it was renamed TO does not exist upstream.
-    // When a mirror name collides with a local one, the local one moves.
-    renamedTypes: [],
-    // No capability table on either side: `STEP_FOR_LOD` is a table of NUMBERS
-    // keyed by level, not of predicates keyed by block id, so neither probe kind
-    // applies. It is compared by the ordinary value comparison, which is what
-    // this gate does with any exported const — and that is sufficient here in a
-    // way it was NOT for `opacityOfBlockId`, because the table is three entries
-    // over a closed union rather than a lookup over 120 block ids.
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    repository: 'mx-gameplay',
-    file: 'src/domain/frame-contract.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    repository: 'mx-multiplayer',
-    file: 'src/domain/frame-contract.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    repository: 'mx-ui',
-    file: 'src/domain/frame-contract.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    // Four capability probes (fallsWhenUnsupported, isReplaceable,
-    // validSpawnSurface, canSupportAttachments) and one property probe
-    // (supportRuleOfBlockId/supportRule) lived here and caught two real
-    // defects (a missing `isReplaceable` id, and `validSpawnSurface`
-    // disagreeing on oak_log). They were removed on 2026-08-30 along with
-    // every other capability/property probe in this file: a probe row is
-    // ALSO an ownership claim that was never itself checked (see the git
-    // history of this file for the incident that motivated the original
-    // probes), and the mirror they probe is itself scheduled for deletion.
-    // Removing them trades away real coverage for a file that still exists
-    // today: without a capability probe, `fallsWhenUnsupported`,
-    // `isReplaceable`, `validSpawnSurface` and `canSupportAttachments` fall
-    // through to the plain by-name comparison, and kernel does not export
-    // any of the four under that name (they live behind
-    // `capabilityOfBlockId`) — so `pnpm check:mirrors` is expected to report
-    // `SymbolNotPublished` for all four, plus for `supportRuleOfBlockId`,
-    // until this file is deleted.
-    repository: 'mx-gameplay',
-    file: 'src/domain/block-vocabulary.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    // `ChunkStore` and its supporting types, restated because mc-worldgen is a
-    // legitimate `dependencies` edge (plan.md §2.1) that is simply not
-    // published yet — see the file's own header. Source is mc-worldgen, not
-    // mc-kernel, even though `BlockId`/`BlockPosition`/`ChunkCoord` in the same
-    // file come from kernel's vocabulary: this row's `source` names the
-    // repository whose BARREL the file will be deleted in favour of, which is
-    // mc-worldgen for `ChunkStore` itself.
-    repository: 'mx-gameplay',
-    file: 'src/domain/chunk-store-port.ts',
-    source: 'mc-worldgen',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    // `PROVISIONAL LOCAL MIRROR of @nerima-games/mc-worldgen's
-    // domain/portal-frame.ts` per the file's own header. mc-kernel also
-    // carries an export-identical `src/domain/portal-frame.ts`, and a diff of
-    // the two shows kernel as the canonical version for the EVENTUAL repoint
-    // — but that is a decision about where the future import points, not
-    // about what this file currently declares itself to mirror, so `source`
-    // stays `mc-worldgen` here, matching the header.
-    repository: 'mx-gameplay',
-    file: 'src/domain/portal-frame-port.ts',
-    source: 'mc-worldgen',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    // Already a two-line re-export from the published `@nerima-games/mc-kernel`
-    // rather than a hand-transcription — mid-migration, not yet deleted. Kept
-    // as a row because a live spec is what makes `check:mirrors` notice when
-    // the file is finally deleted, and it is tracked for removal along with
-    // the other kernel mirrors in this repository.
-    repository: 'mx-gameplay',
-    file: 'src/domain/item-vocabulary.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    // See the note above `MIRROR_SPECS`: no "mirror/restated" header, included
-    // on the strength of its duplicate relationship with kernel's
-    // `coordinate-keys.ts` rather than this file's own claim. Expect
-    // `SymbolNotPublished` findings for every renamed export
-    // (`positionKeyOf`, `positionOfKey` — this file's own two exports).
-    repository: 'mx-gameplay',
-    file: 'src/domain/position-key.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
-  {
-    // See the note above `MIRROR_SPECS`. This file's exports
-    // (`positionKeyOf`, `positionOfKey`, `below`, `above`, `horizontalNeighbours`)
-    // are ALL renamed relative to kernel's `coordinate-keys.ts` /
-    // `coordinate-neighbours.ts`, so every one is expected to read as
-    // `SymbolNotPublished` until this file is deleted and callers are
-    // repointed at the kernel functions directly.
-    repository: 'mx-gameplay',
-    file: 'src/domain/block-position-key.ts',
-    source: 'mc-kernel',
-    renamedTypes: [],
-    capabilities: [],
-    properties: [],
-    rosters: [],
-  },
+  // Empty since Wave 1: every mirror this registry named has been deleted
+  // and its consumers repointed at the owning package. The gate keeps its
+  // machinery for the next mirror somebody introduces — a row added here
+  // resumes comparing immediately — and `describeMirrorRun` distinguishes an
+  // empty registry from an unsynced `repos/`, so neither reads as a pass.
 ]
 
 /**
@@ -1685,7 +1540,17 @@ export const describeMirrorRun = (
   const failing = failingOutcomes(outcomes)
   const lines: Array<string> = []
 
-  if (compared.length === 0) {
+  if (outcomes.length === 0) {
+    // An empty registry and an unsynced `repos/` both compare nothing, and
+    // they mean opposite things: the first is Wave 1's finished work, the
+    // second is a setup step nobody ran. Saying which one applies is the
+    // difference between a gate and a green light.
+    lines.push(
+      'check:mirrors: no mirrors are registered — MIRROR_SPECS is empty, so there is nothing to compare.',
+      'This is the post-Wave-1 steady state, not a skipped run: every mirror was deleted and',
+      'repointed at its owning package. Add a row here the moment a new mirror appears.',
+    )
+  } else if (compared.length === 0) {
     lines.push(
       `check:mirrors: nothing to compare — 0 of ${String(outcomes.length)} mirrors could be checked.`,
       'This is not a failure. repos/ is gitignored, so a fresh clone has nothing in it; run',
