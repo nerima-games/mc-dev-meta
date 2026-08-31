@@ -90,7 +90,39 @@ describe('REPOINT_SPECS', () => {
       packageName: '@nerima-games/mc-kernel',
       source: 'mc-kernel',
     }
-    expect(unmatchedRepointSpecs([stray], MIRROR_SPECS)).toEqual([stray])
+    // A NON-EMPTY mirror fixture, deliberately not MIRROR_SPECS: Wave 1
+    // emptied that registry, and `[].some(predicate)` never calls the
+    // predicate — so passing the real registry here would assert the right
+    // answer while leaving the comparison itself unexecuted.
+    const knownMirror: MirrorSpec = {
+      repository: 'mc-audio',
+      file: 'domain/known.ts',
+      source: 'mc-kernel',
+      renamedTypes: [],
+      capabilities: [],
+      properties: [],
+      rosters: [],
+    }
+    expect(unmatchedRepointSpecs([stray], [knownMirror])).toEqual([stray])
+  })
+
+  it('matches a spec against the mirror row that names the same file', () => {
+    const paired: RepointSpec = {
+      repository: 'mc-audio',
+      file: 'domain/paired.ts',
+      packageName: '@nerima-games/mc-kernel',
+      source: 'mc-kernel',
+    }
+    const mirror: MirrorSpec = {
+      repository: 'mc-audio',
+      file: 'domain/paired.ts',
+      source: 'mc-kernel',
+      renamedTypes: [],
+      capabilities: [],
+      properties: [],
+      rosters: [],
+    }
+    expect(unmatchedRepointSpecs([paired], [mirror])).toEqual([])
   })
 
   /*
@@ -579,6 +611,16 @@ describe('describeRepointRun', () => {
     expect(lines).toContain('nothing to repoint — 0 of 1 could be attempted')
     expect(lines).toContain('This is not a failure')
     expect(lines).toContain('mx-gameplay/domain/frame-contract.ts — not cloned')
+  })
+
+  // REGRESSION — an empty registry and an unsynced repos/ both attempt zero
+  // repoints and mean opposite things: Wave 1's finished work versus a setup
+  // step nobody ran. Telling a reader to run `pnpm sync` when there is simply
+  // nothing left to repoint sends them chasing a problem that does not exist.
+  it('distinguishes an empty registry from an unsynced workspace', () => {
+    const lines = describeRepointRun([], []).join('\n')
+    expect(lines).toContain('no repoints are registered')
+    expect(lines).not.toContain('pnpm sync')
   })
 
   it('names the package, the rewrite count and every project compiled', () => {
