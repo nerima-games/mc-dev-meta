@@ -493,7 +493,17 @@ export const FEATURE_INVENTORY: ReadonlyArray<FeatureRecord> = [
     summary: 'Roster E2E coverage exists, while the final end-to-end gate is still tracked as incomplete.',
     management: 'downstream-runtime',
     evidence: [
-      test('mc-compose', 'test/e2e/roster-frame-order.test.ts', 'Roster frame-order E2E test.'),
+      test(
+        'mc-compose',
+        'test/e2e/roster-frame-order.test.ts',
+        'Stage-order frame audit only — its own header states this does not substitute for the browser gate.',
+      ),
+      gate(
+        'mc-compose',
+        'playwright.config.ts',
+        'Chromium Playwright harness; header names the discovered suite the final gate (plan.md §3.15).',
+      ),
+      gate('mc-compose', '.github/workflows/ci.yaml', 'e2e-browser job runs `pnpm e2e:browser` as the release gate.'),
       documentation('mc-compose', 'README.md', 'Final E2E gate status.'),
       documentation('mc-compose', 'docs/README.md', 'Composition verification status.'),
     ],
