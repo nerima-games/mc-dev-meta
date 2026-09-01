@@ -403,13 +403,15 @@ export const FEATURE_INVENTORY: ReadonlyArray<FeatureRecord> = [
     owner: 'mx-redstone',
     scope: 'experience',
     status: 'partial',
-    summary: 'Power graph, comparators, observers, dispensers, hoppers, and pressure plates.',
+    summary: 'Power graph, comparators, observers, dispensers, hoppers, and pressure plates. For the latter three, only the redstone-rule slice (lock inversion, transfer cadence, rising edge, occupant count to signal strength) is implemented here; item and entity interaction is deliberately out of scope for this module, not a gap.',
     management: 'downstream-runtime',
     evidence: [
       source('mx-redstone', 'src/domain/power-graph.ts', 'Power propagation graph.'),
       source('mx-redstone', 'src/domain/comparator.ts', 'Comparator rules.'),
+      source('mx-redstone', 'src/domain/pressure-plate.ts', 'Occupant-count-to-signal rule; occupancy itself is supplied by the caller.'),
       test('mx-redstone', 'test/power-graph.test.ts', 'Power graph tests.'),
       test('mx-redstone', 'test/comparator.test.ts', 'Comparator tests.'),
+      documentation('mx-redstone', 'README.md', 'Hopper, dispenser, and pressure-plate rows: only the redstone-rule slice is complete here; item/entity interaction is named as out of scope, with the missing types and queries tabulated in docs/design-notes.md DN-RS-17.'),
     ],
   },
   {
