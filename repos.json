@@ -54,7 +54,7 @@
     {
       "name": "mx-gameplay",
       "url": "https://github.com/nerima-games/mx-gameplay.git",
-      "ref": "e08d881087ae3ad71e022adcd971681add54d46c"
+      "ref": "e839fefeeb97f00440ee70a8acc4179c3b1197e9"
     },
     {
       "name": "mx-redstone",
@@ -69,7 +69,7 @@
     {
       "name": "mx-multiplayer",
       "url": "https://github.com/nerima-games/mx-multiplayer.git",
-      "ref": "3ec5e84be88add50a8b633ff4c5a215f199bbfd9"
+      "ref": "041098142dece173649b091d29d3fa94991fffe8"
     },
     {
       "name": "mc-compose",
