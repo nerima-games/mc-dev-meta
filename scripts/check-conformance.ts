@@ -13,11 +13,11 @@ const base = (owner: string): string => owner === 'mc-dev-meta' ? root : path.jo
 
 const main = async (): Promise<number> => {
   const issues = [...validateConformanceCatalog(CONFORMANCE_CATALOG)]
-  for (const record of CONFORMANCE_CATALOG) {
-    for (const evidence of record.evidence) {
-      if (!(await exists(path.join(base(record.owner), evidence)))) issues.push({ id: record.id, code: 'missing-evidence', detail: `missing evidence: ${record.owner}/${evidence}` })
-    }
-  }
+  const evidenceChecks = CONFORMANCE_CATALOG.flatMap((record) => record.evidence.map(async (evidence) =>
+    (await exists(path.join(base(record.owner), evidence)))
+      ? null
+      : { id: record.id, code: 'missing-evidence' as const, detail: `missing evidence: ${record.owner}/${evidence}` }))
+  for (const issue of await Promise.all(evidenceChecks)) if (issue !== null) issues.push(issue)
   if (issues.length > 0) {
     for (const issue of issues) error(`conformance: ${issue.code} [${issue.id}] ${issue.detail}`)
     return 1

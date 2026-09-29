@@ -46,10 +46,10 @@ const fetchSource = async (source: Source): Promise<unknown> => {
 
 export const generate = async (outDirectory: string, fetcher: (source: Source) => Promise<unknown> = fetchSource): Promise<void> => {
   await mkdir(outDirectory, { recursive: true })
-  for (const [name, source] of Object.entries(SOURCES)) {
+  await Promise.all(Object.entries(SOURCES).map(async ([name, source]) => {
     const value = await fetcher(source)
     await writeFile(path.join(outDirectory, `vanilla-${name}.json`), canonicalJson(value), 'utf8')
-  }
+  }))
 }
 
 const outArgument = process.argv.findIndex((argument) => argument === '--out')
