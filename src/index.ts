@@ -10,6 +10,7 @@
 
 export * from './domain/manifest'
 export * from './domain/feature-inventory'
+export * from './domain/conformance-catalog'
 export * from './domain/light-grid'
 export * from './domain/voxel-chunk'
 // The pin decision — what `pnpm update:manifest` writes and what it refuses to.

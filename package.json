@@ -37,6 +37,7 @@
     "update:manifest:latest:dry": "tsx scripts/update-manifest.ts --latest --dry-run",
     "check:workspace": "tsx scripts/check-workspace.ts",
     "check:features": "tsx scripts/check-feature-inventory.ts",
+    "check:conformance": "tsx scripts/check-conformance.ts",
     "check:mirrors": "tsx scripts/check-mirrors.ts",
     "check:portable": "tsx scripts/check-portable-contract.ts",
     "check:repoint": "tsx scripts/check-repoint.ts",
