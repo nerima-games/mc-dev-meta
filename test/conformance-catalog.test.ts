@@ -24,6 +24,7 @@ describe('conformance catalog', () => {
       'empty-field',
       'invalid-authority',
       'invalid-status',
+      'empty-field',
       'duplicate-id',
       'invalid-authority',
       'invalid-status',
