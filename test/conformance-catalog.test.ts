@@ -16,4 +16,17 @@ describe('conformance catalog', () => {
     const issues = validateConformanceCatalog([divergent, conformant])
     expect(issues.map((issue) => issue.code)).toStrictEqual(['missing-reason', 'missing-evidence'])
   })
+
+  it('reports malformed catalog vocabulary and duplicate ids', () => {
+    const malformed = JSON.parse('{"id":"","owner":"mc-dev-meta","authority":"bad","source":{"location":"x","referencedOn":"2026-09-29"},"status":"bad","divergenceReason":null,"evidence":[]}')
+    const issues = validateConformanceCatalog([malformed, malformed])
+    expect(issues.map((issue) => issue.code)).toStrictEqual([
+      'empty-field',
+      'invalid-authority',
+      'invalid-status',
+      'duplicate-id',
+      'invalid-authority',
+      'invalid-status',
+    ])
+  })
 })
