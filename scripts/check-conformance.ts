@@ -4,8 +4,8 @@ import { CONFORMANCE_CATALOG, validateConformanceCatalog } from '../src/domain/c
 import { REPOS_DIRECTORY } from '../src/domain/workspace'
 
 const root = process.cwd()
-const print = (line: string): void => process.stdout.write(`${line}\n`)
-const error = (line: string): void => process.stderr.write(`${line}\n`)
+const print = (line: string): void => { process.stdout.write(`${line}\n`) }
+const error = (line: string): void => { process.stderr.write(`${line}\n`) }
 const exists = async (file: string): Promise<boolean> => {
   try { return (await stat(file)).isFile() } catch { return false }
 }
