@@ -52,10 +52,10 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {
-    "@types/node": "26.4.0",
+    "@types/node": "26.6.5",
     "@vitest/coverage-v8": "4.1.11",
     "effect": "3.22.1",
-    "tsx": "4.23.12",
+    "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
   }
