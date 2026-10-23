@@ -13,6 +13,8 @@
 # it from the packages it exists to fetch.
 packages:
   - 'repos/*'
+overrides:
+  '@vitest/mocker': '4.1.12'
 allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
