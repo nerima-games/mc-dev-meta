@@ -27,7 +27,8 @@
           pkgs = pkgsFor system;
         in
         {
-          # Node 24 matches the `engines` field and the CI runner. pnpm comes
+          # Node 26 matches the CI runner; `engines.node` keeps its supported
+          # >=24.0.0 lower bound. pnpm comes
           # from corepack rather than nixpkgs so that the version is decided by
           # the `packageManager` field in package.json — one source of truth
           # instead of two that can drift.
@@ -41,7 +42,7 @@
           # independently drifting on its own npm-resolved version.
           default = pkgs.mkShell {
             packages = [
-              pkgs.nodejs_24
+              pkgs.nodejs_26
               pkgs.corepack_24
               pkgs.typescript-language-server
               pkgs.oxlint

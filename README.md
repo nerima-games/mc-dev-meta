@@ -46,13 +46,13 @@ repository が管理する。
 ## クイックスタート
 
 ```console
-$ direnv allow          # flake.nix の devShell で nodejs_24 + corepack + oxlint が入る
+$ direnv allow          # flake.nix の devShell で nodejs_26 + corepack_24 + typescript-language-server + oxlint + ast-grep が入る
 $ pnpm install          # このリポジトリ自身の devDependencies (oxlint は上記 devShell 由来)
 $ pnpm sync             # 15 リポジトリを repos/ へ clone
 $ pnpm install          # ここで repos/* が workspace として解決される
 ```
 
-Nix を使わない場合は Node.js 24 以上と pnpm 11 を用意する。
+Nix を使わない場合は Node.js 24 以上と pnpm 12.14.0 を用意する。
 
 `pnpm sync` の後に `pnpm install` をもう一度打つのが要点である。
 1 回目は `repos/` が空なので workspace メンバーがおらず、
