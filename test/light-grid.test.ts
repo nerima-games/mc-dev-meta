@@ -152,8 +152,9 @@ describe('packed light properties', () => {
           const byteIndex = Math.floor(voxel / 2)
           grid[byteIndex] = packedByte
           const neighborVoxel = voxel % 2 === 0 ? voxel + 1 : voxel - 1
+          const expectedNeighborLight = voxel % 2 === 0 ? Math.floor(packedByte / 16) : packedByte % 16
           const neighborBefore = getLightAt(grid, neighborVoxel)
-          if (neighborBefore instanceof LightGridError) return false
+          if (neighborBefore instanceof LightGridError || neighborBefore !== expectedNeighborLight) return false
 
           const setResult = setLightAt(grid, voxel, level)
           if (setResult instanceof LightGridError || setResult !== undefined) return false
@@ -162,7 +163,12 @@ describe('packed light properties', () => {
           if (value instanceof LightGridError || value !== level) return false
 
           const neighborAfter = getLightAt(grid, neighborVoxel)
-          if (neighborAfter instanceof LightGridError || neighborAfter !== neighborBefore) return false
+          if (neighborAfter instanceof LightGridError || neighborAfter !== expectedNeighborLight) return false
+
+          const expectedPackedByte =
+            voxel % 2 === 0
+              ? packedByte - (packedByte % 16) + level
+              : packedByte % 16 + level * 16
 
           const clone = cloneLightGrid(grid)
           return (
@@ -170,7 +176,8 @@ describe('packed light properties', () => {
             clone instanceof Uint8Array &&
             clone.length === LIGHT_BYTE_LENGTH &&
             clone !== grid &&
-            clone[byteIndex] === grid[byteIndex]
+            grid[byteIndex] === expectedPackedByte &&
+            clone[byteIndex] === expectedPackedByte
           )
         },
       ),

@@ -214,10 +214,13 @@ describe('voxel chunk properties', () => {
           const coord = chunkCoord(cx, cz)
           expect(coord).not.toBeInstanceOf(VoxelChunkError)
           if (coord instanceof VoxelChunkError) return
+          const expectedCoord = { cx: cx === 0 ? 0 : cx, cz: cz === 0 ? 0 : cz }
+          expect(coord).toStrictEqual(expectedCoord)
 
           const id = blockId(rawBlockId)
           expect(id).not.toBeInstanceOf(VoxelChunkError)
           if (id instanceof VoxelChunkError) return
+          expect(id).toBe(rawBlockId)
 
           const chunk = createChunk(coord)
           expect(blockIndex(x, y, z)).toBe(y + z * CHUNK_HEIGHT + x * CHUNK_HEIGHT * CHUNK_SIZE_XZ)
@@ -226,7 +229,7 @@ describe('voxel chunk properties', () => {
           const value = readBlockAt(chunk, x, y, z)
           expect(value).not.toBeInstanceOf(VoxelChunkError)
           if (value instanceof VoxelChunkError) return
-          expect(value).toBe(id)
+          expect(value).toBe(rawBlockId)
 
           const encoded = encodeChunk(chunk)
           expect(encoded).toBeInstanceOf(Uint8Array)
@@ -235,12 +238,12 @@ describe('voxel chunk properties', () => {
           const decoded = decodeChunk(encoded)
           expect(decoded).not.toBeInstanceOf(VoxelChunkError)
           if (decoded instanceof VoxelChunkError) return
-          expect(decoded.coord).toStrictEqual(coord)
+          expect(decoded.coord).toStrictEqual(expectedCoord)
 
           const decodedValue = readBlockAt(decoded, x, y, z)
           expect(decodedValue).not.toBeInstanceOf(VoxelChunkError)
           if (decodedValue instanceof VoxelChunkError) return
-          expect(decodedValue).toBe(id)
+          expect(decodedValue).toBe(rawBlockId)
 
           const fromBlocks = createChunkFromBlocks(coord, chunk.blocks)
           expect(fromBlocks).not.toBeInstanceOf(VoxelChunkError)
