@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import * as fc from 'fast-check'
 import { describe, expect, it, vi } from 'vitest'
 import {
   describeManifestError,
@@ -87,7 +88,7 @@ describe('parsing', () => {
   })
 
   // REGRESSION: `JSON.parse` always throws a real `Error` in practice, but the
-  // catch clause's `cause` is typed `unknown` and does not assume that. This
+  // failure mapper's `cause` is typed `unknown` and does not assume that. This
   // pins the fallback for the case where whatever parses the document throws
   // something else, so the detail is still a usable string rather than
   // "[object Object]" or a crash from calling `.message` on a non-Error.
@@ -426,5 +427,52 @@ describe('describeManifestError covers every error tag', () => {
     const message = describeManifestError({ _tag: 'MissingRepository', name: 'mc-noise' })
     expect(message).toContain('no entry for "mc-noise"')
     expect(message).toContain('this workspace manages')
+  })
+})
+
+describe('manifest parsing properties', () => {
+  type InvalidManifestCase = { readonly raw: string; readonly errorTag: ManifestError['_tag'] }
+  const invalidCase = (raw: string, errorTag: ManifestError['_tag']): InvalidManifestCase => ({ raw, errorTag })
+  const validName = fc.constantFrom(...MANAGED_REPOSITORY_NAMES)
+  const pinnedRef = fc
+    .array(fc.constantFrom(...'0123456789abcdef'), { minLength: 40, maxLength: 40 })
+    .map((digits) => digits.join(''))
+  const invalidInput = fc.oneof(
+    fc.string().map((value) => invalidCase(`${JSON.stringify(value)}{`, 'NotJson')),
+    fc.oneof(fc.constant(null), fc.boolean(), fc.integer(), fc.string(), fc.array(fc.jsonValue())).map((value) =>
+      invalidCase(JSON.stringify(value), 'NotAnObject'),
+    ),
+    fc.integer({ min: MANIFEST_VERSION + 1 }).map((version) =>
+      invalidCase(JSON.stringify({ manifestVersion: version, repositories: [] }), 'UnsupportedManifestVersion'),
+    ),
+    fc.oneof(fc.constant(null), fc.boolean(), fc.integer(), fc.string()).map((repositories) =>
+      invalidCase(JSON.stringify({ manifestVersion: MANIFEST_VERSION, repositories }), 'RepositoriesNotAnArray'),
+    ),
+    validName.map((name) => invalidCase(document([entry(name, 'main')]), 'InvalidRef')),
+    validName.map((name) =>
+      invalidCase(document([{ ...entry(name), url: `https://example.com/${name}.git` }]), 'InvalidUrl'),
+    ),
+  )
+
+  it('returns valid manifests for arbitrary valid entries', async () => {
+    await fc.assert(
+      fc.property(validName, pinnedRef, (name, ref) => {
+        const parsed = parseManifest(document([entry(name, ref)]))
+        expect(parsedValue(parsed)).toStrictEqual({
+          manifestVersion: MANIFEST_VERSION,
+          repositories: [entry(name, ref)],
+        })
+      }),
+      { numRuns: 100 },
+    )
+  })
+
+  it('returns tagged failures for arbitrary malformed entries', async () => {
+    await fc.assert(
+      fc.property(invalidInput, ({ raw, errorTag }) => {
+        expect(parsedError(parseManifest(raw))?._tag).toBe(errorTag)
+      }),
+      { numRuns: 100 },
+    )
   })
 })

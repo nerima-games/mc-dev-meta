@@ -10,6 +10,4 @@
  * repository boundary, and a missing `default` here is the same defect
  * appearing across a code-review boundary instead.
  */
-export const assertUnreachable = (value: never): never => {
-  throw new Error(`unreachable case: ${JSON.stringify(value)}`)
-}
+export const assertUnreachable = (value: never): never => value

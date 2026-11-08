@@ -12,6 +12,41 @@ permissions:
   contents: read
 
 jobs:
+  ast-grep-conformance:
+    name: Shared ast-grep conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout conformance inputs
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The composite action scans its consumer root, so keep only the three source directories
+          # and the files needed to run its Nix devShell and load the public-api baseline.
+          sparse-checkout: |
+            /src/
+            /scripts/
+            /test/
+            /flake.nix
+            /flake.lock
+            /.github/actions/nix-setup/
+            /.github/conformance/public-api-baseline.json
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Nix
+        uses: ./.github/actions/nix-setup
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Test shared rules and scan repository
+        uses: nerima-games/.github/conformance/ast-grep@f594176eb568341ab31babbfef16a260979f75f2
+        with:
+          public-api-baseline: .github/conformance/public-api-baseline.json
+
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 15
