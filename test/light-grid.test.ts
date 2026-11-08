@@ -1,3 +1,4 @@
+import * as fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
   clampLightLevel,
@@ -11,11 +12,21 @@ import {
   LightGridError,
   setLightAt,
   type LightGrid,
+  type LightGridErrorCode,
 } from '../src/domain/light-grid'
 import { CHUNK_VOLUME } from '../src/domain/voxel-chunk'
 
 const expectLightGrid: (value: LightGrid | LightGridError) => asserts value is LightGrid = (value) => {
   expect(value).not.toBeInstanceOf(LightGridError)
+}
+
+const expectLightGridFailure = (value: unknown, code: LightGridErrorCode): void => {
+  expect(value).toBeInstanceOf(LightGridError)
+  if (value instanceof LightGridError) {
+    expect(value._tag).toBe('LightGridError')
+    expect(value.name).toBe('LightGridError')
+    expect(value.code).toBe(code)
+  }
 }
 
 describe('portable packed light storage', () => {
@@ -115,5 +126,77 @@ describe('portable packed light storage', () => {
       code: 'invalid-voxel',
       name: 'LightGridError',
     })
+  })
+})
+
+describe('packed light properties', () => {
+  const validGridByte = fc.integer({ min: 0, max: 0xff })
+  const invalidGrid = fc.oneof(
+    fc.jsonValue(),
+    fc.integer({ min: 0, max: LIGHT_BYTE_LENGTH - 1 }).map((length) => new Uint8Array(length)),
+  )
+  const invalidVoxel = fc.oneof(
+    fc.integer({ max: -1 }),
+    fc.integer({ min: CHUNK_VOLUME }),
+    fc.double({ noNaN: true, noInteger: true }),
+  )
+
+  it('round-trips arbitrary valid grids, voxel indices, and light levels', async () => {
+    await fc.assert(
+      fc.property(
+        validGridByte,
+        fc.integer({ min: 0, max: CHUNK_VOLUME - 1 }),
+        fc.integer({ min: LIGHT_LEVEL_MIN, max: LIGHT_LEVEL_MAX }),
+        (packedByte, voxel, level) => {
+          const grid = createLightGrid()
+          const byteIndex = Math.floor(voxel / 2)
+          grid[byteIndex] = packedByte
+          const neighborVoxel = voxel % 2 === 0 ? voxel + 1 : voxel - 1
+          const neighborBefore = getLightAt(grid, neighborVoxel)
+          if (neighborBefore instanceof LightGridError) return false
+
+          const setResult = setLightAt(grid, voxel, level)
+          if (setResult instanceof LightGridError || setResult !== undefined) return false
+
+          const value = getLightAt(grid, voxel)
+          if (value instanceof LightGridError || value !== level) return false
+
+          const neighborAfter = getLightAt(grid, neighborVoxel)
+          if (neighborAfter instanceof LightGridError || neighborAfter !== neighborBefore) return false
+
+          const clone = cloneLightGrid(grid)
+          return (
+            !(clone instanceof LightGridError) &&
+            clone instanceof Uint8Array &&
+            clone.length === LIGHT_BYTE_LENGTH &&
+            clone !== grid &&
+            clone[byteIndex] === grid[byteIndex]
+          )
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('returns typed failures for arbitrary invalid grids', async () => {
+    await fc.assert(
+      fc.property(invalidGrid, fc.integer({ min: 0, max: CHUNK_VOLUME - 1 }), (grid, voxel) => {
+        expectLightGridFailure(getLightAt(grid as never, voxel), 'invalid-grid')
+        expectLightGridFailure(setLightAt(grid as never, voxel, 1), 'invalid-grid')
+        expectLightGridFailure(cloneLightGrid(grid as never), 'invalid-grid')
+      }),
+      { numRuns: 100 },
+    )
+  })
+
+  it('returns typed failures for arbitrary invalid voxel indices', async () => {
+    await fc.assert(
+      fc.property(invalidVoxel, (voxel) => {
+        const grid = createLightGrid()
+        expectLightGridFailure(getLightAt(grid, voxel), 'invalid-voxel')
+        expectLightGridFailure(setLightAt(grid, voxel, 1), 'invalid-voxel')
+      }),
+      { numRuns: 100 },
+    )
   })
 })

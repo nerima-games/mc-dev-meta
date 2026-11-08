@@ -1,3 +1,4 @@
+import * as fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
   AIR_BLOCK_ID,
@@ -174,5 +175,130 @@ describe('portable voxel chunk codec', () => {
     const view = new DataView(unsafeCoordinate.buffer, unsafeCoordinate.byteOffset, unsafeCoordinate.byteLength)
     view.setBigInt64(5, BigInt(Number.MAX_SAFE_INTEGER) + 1n, true)
     expectFailure(decodeChunk(unsafeCoordinate), 'invalid-value', /safe integer range/)
+  })
+})
+
+describe('voxel chunk properties', () => {
+  const invalidBlockId = fc.oneof(
+    fc.integer({ max: -1 }),
+    fc.integer({ min: BLOCK_ID_MAX + 1 }),
+    fc.double({ noNaN: true, noInteger: true }),
+    fc.constant(Number.NaN),
+  )
+  const invalidChunkCoordinate = fc.oneof(
+    fc.bigInt({
+      min: BigInt(Number.MAX_SAFE_INTEGER) + 1n,
+      max: BigInt(Number.MAX_SAFE_INTEGER) + 1_000_000n,
+    }).map(Number),
+    fc.double({ noNaN: true, noInteger: true }),
+  )
+  const invalidLocalCoordinate = fc.oneof(
+    fc.integer({ max: -1 }),
+    fc.integer({ min: CHUNK_HEIGHT }),
+    fc.double({ noNaN: true, noInteger: true }),
+  )
+  const invalidBlockBuffer = fc
+    .integer({ min: 0, max: CHUNK_VOLUME - 1 })
+    .map((length) => new Uint8Array(length))
+
+  it('round-trips arbitrary valid chunk coordinates, positions, and block IDs', async () => {
+    await fc.assert(
+      fc.property(
+        fc.integer({ min: -1_000_000, max: 1_000_000 }),
+        fc.integer({ min: -1_000_000, max: 1_000_000 }),
+        fc.integer({ min: 0, max: CHUNK_SIZE_XZ - 1 }),
+        fc.integer({ min: 0, max: CHUNK_HEIGHT - 1 }),
+        fc.integer({ min: 0, max: CHUNK_SIZE_XZ - 1 }),
+        fc.integer({ min: 0, max: BLOCK_ID_MAX }),
+        (cx, cz, x, y, z, rawBlockId) => {
+          const coord = chunkCoord(cx, cz)
+          expect(coord).not.toBeInstanceOf(VoxelChunkError)
+          if (coord instanceof VoxelChunkError) return
+
+          const id = blockId(rawBlockId)
+          expect(id).not.toBeInstanceOf(VoxelChunkError)
+          if (id instanceof VoxelChunkError) return
+
+          const chunk = createChunk(coord)
+          expect(blockIndex(x, y, z)).toBe(y + z * CHUNK_HEIGHT + x * CHUNK_HEIGHT * CHUNK_SIZE_XZ)
+          expect(setBlockAt(chunk, x, y, z, id)).toBeUndefined()
+
+          const value = readBlockAt(chunk, x, y, z)
+          expect(value).not.toBeInstanceOf(VoxelChunkError)
+          if (value instanceof VoxelChunkError) return
+          expect(value).toBe(id)
+
+          const encoded = encodeChunk(chunk)
+          expect(encoded).toBeInstanceOf(Uint8Array)
+          if (encoded instanceof VoxelChunkError) return
+
+          const decoded = decodeChunk(encoded)
+          expect(decoded).not.toBeInstanceOf(VoxelChunkError)
+          if (decoded instanceof VoxelChunkError) return
+          expect(decoded.coord).toStrictEqual(coord)
+
+          const decodedValue = readBlockAt(decoded, x, y, z)
+          expect(decodedValue).not.toBeInstanceOf(VoxelChunkError)
+          if (decodedValue instanceof VoxelChunkError) return
+          expect(decodedValue).toBe(id)
+
+          const fromBlocks = createChunkFromBlocks(coord, chunk.blocks)
+          expect(fromBlocks).not.toBeInstanceOf(VoxelChunkError)
+          if (fromBlocks instanceof VoxelChunkError) return
+          expect(fromBlocks.blocks).toBe(chunk.blocks)
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('returns typed failures for arbitrary invalid block IDs and chunk coordinates', async () => {
+    await fc.assert(
+      fc.property(invalidBlockId, (value) => {
+        expectFailure(blockId(value), 'invalid-value', /integer/)
+      }),
+      { numRuns: 100 },
+    )
+
+    await fc.assert(
+      fc.property(invalidChunkCoordinate, (value) => {
+        expectFailure(chunkCoord(value, 0), 'invalid-value', /safe integers/)
+        expectFailure(chunkCoord(0, value), 'invalid-value', /safe integers/)
+      }),
+      { numRuns: 100 },
+    )
+  })
+
+  it('returns typed failures for arbitrary invalid local coordinates and buffers', async () => {
+    const coord = expectValue(chunkCoord(0, 0))
+    const chunk = createChunk(coord)
+
+    await fc.assert(
+      fc.property(invalidLocalCoordinate, (value) => {
+        expectFailure(blockIndex(value, 0, 0), 'invalid-value', /x must/)
+        expectFailure(blockIndex(0, value, 0), 'invalid-value', /y must/)
+        expectFailure(blockIndex(0, 0, value), 'invalid-value', /z must/)
+        expectFailure(readBlockAt(chunk, value, 0, 0), 'invalid-value', /x must/)
+        expectFailure(setBlockAt(chunk, value, 0, 0, AIR_BLOCK_ID), 'invalid-value', /x must/)
+      }),
+      { numRuns: 100 },
+    )
+
+    await fc.assert(
+      fc.property(invalidBlockBuffer, (blocks) => {
+        expectFailure(createChunkFromBlocks(coord, blocks), 'invalid-value', /exactly/)
+      }),
+      { numRuns: 100 },
+    )
+  })
+
+  it('returns typed failures for arbitrary non-chunks and non-encoded inputs', async () => {
+    await fc.assert(
+      fc.property(fc.jsonValue(), (value) => {
+        expectFailure(encodeChunk(value as never), 'invalid-value', /./)
+        expectFailure(decodeChunk(value as never), 'invalid-value', /Uint8Array/)
+      }),
+      { numRuns: 100 },
+    )
   })
 })
