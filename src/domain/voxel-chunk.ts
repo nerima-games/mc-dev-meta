@@ -202,7 +202,6 @@ export const decodeChunk = (encoded: Uint8Array): VoxelChunk | VoxelChunkError =
     return new VoxelChunkError('invalid-value', 'encoded chunk coordinates exceed JavaScript safe integer range')
   }
 
-  const coord = chunkCoord(cx, cz)
-  if (coord instanceof VoxelChunkError) return coord
+  const coord = { cx: normalizeZero(cx) as ChunkAxis, cz: normalizeZero(cz) as ChunkAxis }
   return createChunkFromBlocks(coord, validatedEncoded.slice(CHUNK_CODEC_HEADER_BYTES))
 }

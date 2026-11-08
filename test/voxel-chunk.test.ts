@@ -64,12 +64,14 @@ describe('portable voxel chunk data', () => {
     expect(blockIndex(0, 1, 0)).toBe(1)
     expect(blockIndex(0, 0, 1)).toBe(CHUNK_HEIGHT)
     expect(blockIndex(1, 0, 0)).toBe(CHUNK_HEIGHT * CHUNK_SIZE_XZ)
+    expectFailure(readBlockAt(chunk, -1, 0, 0), 'invalid-value', /x must/)
 
     setBlockAt(chunk, 15, 255, 15, expectValue(blockId(BLOCK_ID_MAX)))
     expect(readBlockAt(chunk, 15, 255, 15)).toBe(BLOCK_ID_MAX)
     expectFailure(blockIndex(-1, 0, 0), 'invalid-value', /x must/)
     expectFailure(blockIndex(0, CHUNK_HEIGHT, 0), 'invalid-value', /y must/)
     expectFailure(blockIndex(0, 0, CHUNK_SIZE_XZ), 'invalid-value', /z must/)
+    expectFailure(setBlockAt(chunk, -1, 0, 0, expectValue(blockId(1))), 'invalid-value', /x must/)
     expectFailure(setBlockAt(chunk, 0, 0, 0, 256 as never), 'invalid-value', /block id/)
 
     const blocks = new Uint8Array(CHUNK_VOLUME)

@@ -82,6 +82,15 @@ describe('portable packed light storage', () => {
       message: 'light grid must be a Uint8Array',
     })
 
+    const nonGridWrite = setLightAt([] as never, 0, 1)
+    expect(nonGridWrite).toBeInstanceOf(LightGridError)
+    expect(nonGridWrite).toMatchObject({
+      _tag: 'LightGridError',
+      name: 'LightGridError',
+      code: 'invalid-grid',
+      message: 'light grid must be a Uint8Array',
+    })
+
     const wrongLength = cloneLightGrid(new Uint8Array(0))
     expect(wrongLength).toBeInstanceOf(LightGridError)
     expect(wrongLength).toMatchObject({
