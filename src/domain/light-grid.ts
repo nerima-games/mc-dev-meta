@@ -17,32 +17,39 @@ export type ChunkLight = {
 
 export type LightGridErrorCode = 'invalid-grid' | 'invalid-voxel'
 
-export class LightGridError extends Error {
-  constructor(
-    public readonly code: LightGridErrorCode,
-    message: string,
-  ) {
-    super(message)
-    this.name = 'LightGridError'
+export class LightGridError {
+  public readonly _tag = 'LightGridError'
+  public readonly name = 'LightGridError'
+  public readonly code: LightGridErrorCode
+  public readonly message: string
+
+  constructor(code: LightGridErrorCode, message: string) {
+    this.code = code
+    this.message = message
   }
 }
 
-const assertLightGrid: (grid: unknown) => asserts grid is LightGrid = (grid: unknown): asserts grid is LightGrid => {
+const assertLightGrid = (grid: unknown): LightGrid | LightGridError => {
   if (!(grid instanceof Uint8Array)) {
-    throw new LightGridError('invalid-grid', 'light grid must be a Uint8Array')
+    return new LightGridError('invalid-grid', 'light grid must be a Uint8Array')
   }
   if (grid.length !== LIGHT_BYTE_LENGTH) {
-    throw new LightGridError(
+    return new LightGridError(
       'invalid-grid',
       `light grid must contain exactly ${LIGHT_BYTE_LENGTH} bytes: ${grid.length}`,
     )
   }
+  return grid
 }
 
-const assertVoxelIndex: (voxel: number) => void = (voxel: number): void => {
+const assertVoxelIndex = (voxel: number): number | LightGridError => {
   if (!Number.isInteger(voxel) || voxel < 0 || voxel >= CHUNK_VOLUME) {
-    throw new LightGridError('invalid-voxel', `voxel index must be an integer from 0 to ${CHUNK_VOLUME - 1}: ${voxel}`)
+    return new LightGridError(
+      'invalid-voxel',
+      `voxel index must be an integer from 0 to ${CHUNK_VOLUME - 1}: ${voxel}`,
+    )
   }
+  return voxel
 }
 
 export const clampLightLevel = (value: number): number =>
@@ -56,23 +63,32 @@ export const createChunkLight = (): ChunkLight => ({
 })
 
 /** Even voxel indices occupy the low nibble; odd indices occupy the high nibble. */
-export const getLightAt = (grid: LightGrid, voxel: number): number => {
-  assertLightGrid(grid)
-  assertVoxelIndex(voxel)
-  const byte = grid[voxel >> 1]!
-  return (voxel & 1) === 0 ? byte & 0x0f : (byte >> 4) & 0x0f
+export const getLightAt = (grid: LightGrid, voxel: number): number | LightGridError => {
+  const checkedGrid = assertLightGrid(grid)
+  if (checkedGrid instanceof LightGridError) return checkedGrid
+
+  const checkedVoxel = assertVoxelIndex(voxel)
+  if (checkedVoxel instanceof LightGridError) return checkedVoxel
+
+  const byte = checkedGrid[checkedVoxel >> 1]!
+  return (checkedVoxel & 1) === 0 ? byte & 0x0f : (byte >> 4) & 0x0f
 }
 
-export const setLightAt = (grid: LightGrid, voxel: number, level: number): void => {
-  assertLightGrid(grid)
-  assertVoxelIndex(voxel)
-  const index = voxel >> 1
-  const byte = grid[index]!
+export const setLightAt = (grid: LightGrid, voxel: number, level: number): void | LightGridError => {
+  const checkedGrid = assertLightGrid(grid)
+  if (checkedGrid instanceof LightGridError) return checkedGrid
+
+  const checkedVoxel = assertVoxelIndex(voxel)
+  if (checkedVoxel instanceof LightGridError) return checkedVoxel
+
+  const index = checkedVoxel >> 1
+  const byte = checkedGrid[index]!
   const clamped = clampLightLevel(level)
-  grid[index] = (voxel & 1) === 0 ? (byte & 0xf0) | clamped : (byte & 0x0f) | (clamped << 4)
+  checkedGrid[index] = (checkedVoxel & 1) === 0 ? (byte & 0xf0) | clamped : (byte & 0x0f) | (clamped << 4)
 }
 
-export const cloneLightGrid = (grid: LightGrid): LightGrid => {
-  assertLightGrid(grid)
-  return grid.slice()
+export const cloneLightGrid = (grid: LightGrid): LightGrid | LightGridError => {
+  const checkedGrid = assertLightGrid(grid)
+  if (checkedGrid instanceof LightGridError) return checkedGrid
+  return checkedGrid.slice()
 }

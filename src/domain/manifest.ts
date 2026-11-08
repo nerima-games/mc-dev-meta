@@ -73,6 +73,7 @@
  * option-injection class stays closed without them having to know it existed.
  * Do not delete it as dead code.
  */
+import { Effect } from 'effect'
 import { assertUnreachable } from './exhaustive'
 
 /** Manifest schema version. Bumped when the shape below changes incompatibly. */
@@ -155,10 +156,8 @@ export type ManifestError =
 /**
  * A parse result.
  *
- * Hand-rolled rather than `Either` from `effect`: mc-dev-meta has NO runtime
- * dependencies at all. It is the tool that fetches the packages, so it cannot
- * be bootstrapped from them, and keeping its dependency list empty makes that
- * a fact rather than an intention.
+ * Kept as a plain discriminated union so callers can inspect parse outcomes
+ * without running an Effect.
  */
 export type Parsed<A> =
   | { readonly ok: true; readonly value: A }
@@ -193,12 +192,25 @@ const stringField = (
  * can be parsed and inspected even while the roster is changing.
  */
 export const parseManifest = (raw: string): Parsed<Manifest> => {
-  let document: unknown
-  try {
-    document = JSON.parse(raw)
-  } catch (cause) {
-    return fail({ _tag: 'NotJson', detail: cause instanceof Error ? cause.message : String(cause) })
+  const parsedDocument = Effect.runSync(
+    Effect.match(
+      Effect.try({
+        try: () => JSON.parse(raw) as unknown,
+        catch: (cause): ManifestError => ({
+          _tag: 'NotJson',
+          detail: cause instanceof Error ? cause.message : String(cause),
+        }),
+      }),
+      {
+        onFailure: (error) => fail<unknown>(error),
+        onSuccess: (value) => ok(value),
+      },
+    ),
+  )
+  if (!parsedDocument.ok) {
+    return fail(parsedDocument.error)
   }
+  const document = parsedDocument.value
 
   if (!isRecord(document)) {
     return fail({ _tag: 'NotAnObject' })

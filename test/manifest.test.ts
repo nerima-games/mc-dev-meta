@@ -87,7 +87,7 @@ describe('parsing', () => {
   })
 
   // REGRESSION: `JSON.parse` always throws a real `Error` in practice, but the
-  // catch clause's `cause` is typed `unknown` and does not assume that. This
+  // failure mapper's `cause` is typed `unknown` and does not assume that. This
   // pins the fallback for the case where whatever parses the document throws
   // something else, so the detail is still a usable string rather than
   // "[object Object]" or a crash from calling `.message` on a non-Error.

@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import * as Either from 'effect/Either'
 import * as Schema from 'effect/Schema'
 
 export const PINS = {
@@ -54,7 +53,7 @@ export const canonicalJson = (value: unknown): string => `${JSON.stringify(stabl
 
 const decodeSchema = (schema: Schema.Schema.AnyNoContext, value: unknown, label: string): unknown => {
   const result = Schema.decodeUnknownEither(schema)(value)
-  if (Either.isLeft(result)) throw new Error(`mcmeta ${label} failed schema validation: ${String(result.left)}`)
+  if (result._tag === 'Left') throw new Error(`mcmeta ${label} failed schema validation: ${String(result.left)}`)
   return result.right
 }
 
@@ -75,7 +74,7 @@ const fetchJson = async (url: string, source: Source): Promise<unknown> => decod
 const fetchTreeRecords = async (source: Source): Promise<unknown> => {
   const treeResponse = await fetchRaw(`https://api.github.com/repos/misode/mcmeta/git/trees/${PINS[source.pin]}?recursive=1`)
   const treeResult = Schema.decodeUnknownEither(tree)(treeResponse)
-  if (Either.isLeft(treeResult)) throw new Error(`mcmeta ${source.file} tree failed schema validation: ${String(treeResult.left)}`)
+  if (treeResult._tag === 'Left') throw new Error(`mcmeta ${source.file} tree failed schema validation: ${String(treeResult.left)}`)
   const files = treeResult.right.tree
     .filter((entry) => entry.type === 'blob' && entry.path.startsWith(source.file) && entry.path.endsWith('.json'))
     .sort((left, right) => left.path.localeCompare(right.path))

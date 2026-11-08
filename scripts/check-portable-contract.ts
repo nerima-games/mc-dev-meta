@@ -21,12 +21,14 @@ import {
   CHUNK_HEIGHT,
   CHUNK_SIZE_XZ,
   CHUNK_VOLUME,
+  VoxelChunkError,
 } from '../src/domain/voxel-chunk'
 import {
   clampLightLevel,
   createChunkLight,
   createLightGrid,
   getLightAt,
+  LightGridError,
   LIGHT_BYTE_LENGTH,
   LIGHT_LEVEL_MAX,
   LIGHT_LEVEL_MIN,
@@ -194,6 +196,11 @@ const compareWorldgen = async (): Promise<void> => {
       for (let z = 0; z < CHUNK_SIZE_XZ; z += 1) {
         for (let y = 0; y < CHUNK_HEIGHT; y += 1) {
           const expected = blockIndex(x, y, z)
+          if (expected instanceof VoxelChunkError) {
+            mismatchCount += 1
+            firstMismatch ??= `blockIndex(${x}, ${y}, ${z}) failed: ${expected.message}`
+            continue
+          }
           const actual = numberResult(worldgenIndex(x, y, z))
           if (actual !== expected) {
             mismatchCount += 1
@@ -268,10 +275,17 @@ const compareWorldgenLight = async (): Promise<void> => {
   if (dependencyGet !== undefined && dependencySet !== undefined) {
     const rootGrid = createLightGrid()
     const dependencyGrid = new Uint8Array(LIGHT_BYTE_LENGTH)
+    const rootWriteErrors: string[] = []
     for (let voxel = 0; voxel < CHUNK_VOLUME; voxel += 1) {
       const level = lightProbeLevel(voxel)
-      setLightAt(rootGrid, voxel, level)
+      const result = setLightAt(rootGrid, voxel, level)
+      if (result instanceof LightGridError) {
+        rootWriteErrors.push(`setLightAt(${voxel}): ${result.code} ${result.message}`)
+      }
       dependencySet(dependencyGrid, voxel, level)
+    }
+    if (rootWriteErrors.length > 0) {
+      failures.push(`mc-dev-meta setLightAt: ${String(rootWriteErrors.length)} failures; first ${rootWriteErrors[0]}`)
     }
     equalBytes(`mc-worldgen packed light grid (${String(CHUNK_VOLUME)} valid voxels)`, rootGrid, dependencyGrid)
 
@@ -279,6 +293,11 @@ const compareWorldgenLight = async (): Promise<void> => {
     let firstMismatch: string | undefined
     for (let voxel = 0; voxel < CHUNK_VOLUME; voxel += 1) {
       const expected = getLightAt(rootGrid, voxel)
+      if (expected instanceof LightGridError) {
+        mismatchCount += 1
+        firstMismatch ??= `getLightAt(${voxel}) failed: ${expected.code} ${expected.message}`
+        continue
+      }
       const actual = numberResult(dependencyGet(dependencyGrid, voxel))
       if (actual !== expected) {
         mismatchCount += 1

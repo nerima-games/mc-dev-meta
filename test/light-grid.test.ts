@@ -10,8 +10,13 @@ import {
   LIGHT_LEVEL_MIN,
   LightGridError,
   setLightAt,
+  type LightGrid,
 } from '../src/domain/light-grid'
 import { CHUNK_VOLUME } from '../src/domain/voxel-chunk'
+
+const expectLightGrid: (value: LightGrid | LightGridError) => asserts value is LightGrid = (value) => {
+  expect(value).not.toBeInstanceOf(LightGridError)
+}
 
 describe('portable packed light storage', () => {
   it('creates separate zeroed sky and block grids', () => {
@@ -59,6 +64,7 @@ describe('portable packed light storage', () => {
     setLightAt(original, 0, 11)
 
     const clone = cloneLightGrid(original)
+    expectLightGrid(clone)
     expect(clone).not.toBe(original)
     expect(clone).toStrictEqual(original)
 
@@ -68,14 +74,37 @@ describe('portable packed light storage', () => {
   })
 
   it('rejects malformed grids and voxel indices', () => {
-    expect(() => getLightAt([] as never, 0)).toThrowError(
-      expect.objectContaining({ code: 'invalid-grid' }),
-    )
-    expect(() => cloneLightGrid(new Uint8Array(0))).toThrowError(LightGridError)
-    expect(() => setLightAt(createLightGrid(), 0.5, 1)).toThrowError(
-      expect.objectContaining({ code: 'invalid-voxel' }),
-    )
-    expect(() => getLightAt(createLightGrid(), -1)).toThrowError(/0 to 65535/)
-    expect(() => getLightAt(createLightGrid(), CHUNK_VOLUME)).toThrowError(LightGridError)
+    const nonGrid = getLightAt([] as never, 0)
+    expect(nonGrid).toBeInstanceOf(LightGridError)
+    expect(nonGrid).toMatchObject({
+      _tag: 'LightGridError',
+      code: 'invalid-grid',
+      message: 'light grid must be a Uint8Array',
+    })
+
+    const wrongLength = cloneLightGrid(new Uint8Array(0))
+    expect(wrongLength).toBeInstanceOf(LightGridError)
+    expect(wrongLength).toMatchObject({
+      code: 'invalid-grid',
+      message: `light grid must contain exactly ${LIGHT_BYTE_LENGTH} bytes: 0`,
+    })
+
+    const fractionalIndex = setLightAt(createLightGrid(), 0.5, 1)
+    expect(fractionalIndex).toBeInstanceOf(LightGridError)
+    expect(fractionalIndex).toMatchObject({
+      _tag: 'LightGridError',
+      code: 'invalid-voxel',
+      message: `voxel index must be an integer from 0 to ${CHUNK_VOLUME - 1}: 0.5`,
+    })
+
+    expect(getLightAt(createLightGrid(), -1)).toMatchObject({
+      code: 'invalid-voxel',
+      message: 'voxel index must be an integer from 0 to 65535: -1',
+    })
+    expect(getLightAt(createLightGrid(), CHUNK_VOLUME)).toMatchObject({
+      _tag: 'LightGridError',
+      code: 'invalid-voxel',
+      name: 'LightGridError',
+    })
   })
 })

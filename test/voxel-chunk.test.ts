@@ -19,8 +19,24 @@ import {
   readBlockAt,
   setBlockAt,
   VoxelChunkError,
+  type VoxelChunkErrorCode,
   type VoxelChunk,
 } from '../src/domain/voxel-chunk'
+
+const expectValue = <A>(result: A | VoxelChunkError): A => {
+  expect(result).not.toBeInstanceOf(VoxelChunkError)
+  return result as A
+}
+
+const expectFailure = (result: unknown, code: VoxelChunkErrorCode, message: RegExp | string): void => {
+  expect(result).toBeInstanceOf(VoxelChunkError)
+  if (result instanceof VoxelChunkError) {
+    expect(result._tag).toBe('VoxelChunkError')
+    expect(result.name).toBe('VoxelChunkError')
+    expect(result.code).toBe(code)
+    expect(result.message).toMatch(message)
+  }
+}
 
 describe('portable voxel chunk data', () => {
   it('validates block IDs and chunk coordinates', () => {
@@ -30,18 +46,18 @@ describe('portable voxel chunk data', () => {
       cx: -123,
       cz: Number.MAX_SAFE_INTEGER,
     })
-    const normalized = chunkCoord(-0, -0)
+    const normalized = expectValue(chunkCoord(-0, -0))
     expect(Object.is(normalized.cx, -0)).toBe(false)
     expect(Object.is(normalized.cz, -0)).toBe(false)
 
-    expect(() => blockId(-1)).toThrowError(VoxelChunkError)
-    expect(() => blockId(1.5)).toThrowError(/integer/)
-    expect(() => blockId(BLOCK_ID_MAX + 1)).toThrowError(/0 to 255/)
-    expect(() => chunkCoord(Number.MAX_SAFE_INTEGER + 1, 0)).toThrowError(/safe integers/)
+    expectFailure(blockId(-1), 'invalid-value', /integer/)
+    expectFailure(blockId(1.5), 'invalid-value', /integer/)
+    expectFailure(blockId(BLOCK_ID_MAX + 1), 'invalid-value', /0 to 255/)
+    expectFailure(chunkCoord(Number.MAX_SAFE_INTEGER + 1, 0), 'invalid-value', /safe integers/)
   })
 
   it('uses the Y-major 16×256×16 layout and live block buffer', () => {
-    const coord = chunkCoord(2, -3)
+    const coord = expectValue(chunkCoord(2, -3))
     const chunk = createChunk(coord)
     expect(chunk.blocks).toHaveLength(CHUNK_VOLUME)
     expect(readBlockAt(chunk, 0, 0, 0)).toBe(AIR_BLOCK_ID)
@@ -49,35 +65,47 @@ describe('portable voxel chunk data', () => {
     expect(blockIndex(0, 0, 1)).toBe(CHUNK_HEIGHT)
     expect(blockIndex(1, 0, 0)).toBe(CHUNK_HEIGHT * CHUNK_SIZE_XZ)
 
-    setBlockAt(chunk, 15, 255, 15, blockId(BLOCK_ID_MAX))
+    setBlockAt(chunk, 15, 255, 15, expectValue(blockId(BLOCK_ID_MAX)))
     expect(readBlockAt(chunk, 15, 255, 15)).toBe(BLOCK_ID_MAX)
-    expect(() => blockIndex(-1, 0, 0)).toThrowError(/x must/)
-    expect(() => blockIndex(0, CHUNK_HEIGHT, 0)).toThrowError(/y must/)
-    expect(() => blockIndex(0, 0, CHUNK_SIZE_XZ)).toThrowError(/z must/)
-    expect(() => setBlockAt(chunk, 0, 0, 0, 256 as never)).toThrowError(VoxelChunkError)
+    expectFailure(blockIndex(-1, 0, 0), 'invalid-value', /x must/)
+    expectFailure(blockIndex(0, CHUNK_HEIGHT, 0), 'invalid-value', /y must/)
+    expectFailure(blockIndex(0, 0, CHUNK_SIZE_XZ), 'invalid-value', /z must/)
+    expectFailure(setBlockAt(chunk, 0, 0, 0, 256 as never), 'invalid-value', /block id/)
 
     const blocks = new Uint8Array(CHUNK_VOLUME)
-    const fromBlocks = createChunkFromBlocks(coord, blocks)
+    const fromBlocks = expectValue(createChunkFromBlocks(coord, blocks))
     expect(fromBlocks.blocks).toBe(blocks)
-    expect(() => createChunkFromBlocks(coord, new Uint8Array(0))).toThrowError(/exactly/)
-    expect(() => createChunkFromBlocks(coord, [] as never)).toThrowError(/Uint8Array/)
+    expectFailure(createChunkFromBlocks(coord, new Uint8Array(0)), 'invalid-value', /exactly/)
+    expectFailure(createChunkFromBlocks(coord, [] as never), 'invalid-value', /Uint8Array/)
   })
 
   it('rejects malformed chunks before encoding', () => {
-    const coord = chunkCoord(0, 0)
-    expect(() => encodeChunk({ coord, blocks: new Uint8Array(0) } as VoxelChunk)).toThrowError(/exactly/)
-    expect(() => encodeChunk({ coord: { cx: Infinity, cz: 0 }, blocks: new Uint8Array(CHUNK_VOLUME) } as never)).toThrowError(
+    const coord = expectValue(chunkCoord(0, 0))
+    expectFailure(encodeChunk({ coord, blocks: new Uint8Array(0) } as VoxelChunk), 'invalid-value', /exactly/)
+    expectFailure(
+      encodeChunk({ coord: { cx: Infinity, cz: 0 }, blocks: new Uint8Array(CHUNK_VOLUME) } as never),
+      'invalid-value',
       /safe integers/,
     )
-    expect(() => encodeChunk(null as never)).toThrowError(/object/)
-    expect(() => encodeChunk({ blocks: new Uint8Array(CHUNK_VOLUME) } as never)).toThrowError(/coord must be an object/)
-    expect(() => encodeChunk({ coord: null, blocks: new Uint8Array(CHUNK_VOLUME) } as never)).toThrowError(
+    expectFailure(encodeChunk(null as never), 'invalid-value', /object/)
+    expectFailure(
+      encodeChunk({ blocks: new Uint8Array(CHUNK_VOLUME) } as never),
+      'invalid-value',
       /coord must be an object/,
     )
-    expect(() => encodeChunk({ coord: { cx: '0', cz: 0 }, blocks: new Uint8Array(CHUNK_VOLUME) } as never)).toThrowError(
+    expectFailure(
+      encodeChunk({ coord: null, blocks: new Uint8Array(CHUNK_VOLUME) } as never),
+      'invalid-value',
+      /coord must be an object/,
+    )
+    expectFailure(
+      encodeChunk({ coord: { cx: '0', cz: 0 }, blocks: new Uint8Array(CHUNK_VOLUME) } as never),
+      'invalid-value',
       /coordinates must be numbers/,
     )
-    expect(() => encodeChunk({ coord: { cx: 0, cz: '0' }, blocks: new Uint8Array(CHUNK_VOLUME) } as never)).toThrowError(
+    expectFailure(
+      encodeChunk({ coord: { cx: 0, cz: '0' }, blocks: new Uint8Array(CHUNK_VOLUME) } as never),
+      'invalid-value',
       /coordinates must be numbers/,
     )
   })
@@ -85,9 +113,9 @@ describe('portable voxel chunk data', () => {
 
 describe('portable voxel chunk codec', () => {
   it('round-trips coordinates and block bytes deterministically', () => {
-    const chunk = createChunk(chunkCoord(-123, 456))
-    setBlockAt(chunk, 1, 2, 3, blockId(42))
-    const encoded = encodeChunk(chunk)
+    const chunk = createChunk(expectValue(chunkCoord(-123, 456)))
+    setBlockAt(chunk, 1, 2, 3, expectValue(blockId(42)))
+    const encoded = expectValue(encodeChunk(chunk))
 
     expect(encoded).toHaveLength(CHUNK_CODEC_BYTE_LENGTH)
     expect([...encoded.slice(0, CHUNK_CODEC_HEADER_BYTES)]).toStrictEqual([
@@ -117,7 +145,7 @@ describe('portable voxel chunk codec', () => {
 
     const padded = new Uint8Array(encoded.length + 2)
     padded.set(encoded, 1)
-    const decoded = decodeChunk(padded.subarray(1, padded.length - 1))
+    const decoded = expectValue(decodeChunk(padded.subarray(1, padded.length - 1)))
     expect(decoded.coord).toStrictEqual(chunk.coord)
     expect(decoded.blocks).not.toBe(chunk.blocks)
     expect(readBlockAt(decoded, 1, 2, 3)).toBe(42)
@@ -125,30 +153,24 @@ describe('portable voxel chunk codec', () => {
   })
 
   it('rejects length, magic, version, and coordinate errors', () => {
-    const encoded = encodeChunk(createChunk(chunkCoord(0, 0)))
+    const encoded = expectValue(encodeChunk(createChunk(expectValue(chunkCoord(0, 0)))))
 
-    expect(() => decodeChunk(null as never)).toThrowError(/Uint8Array/)
-    expect(() => decodeChunk(new DataView(new ArrayBuffer(0)) as never)).toThrowError(/Uint8Array/)
-    expect(() => decodeChunk(encoded.slice(0, -1))).toThrowError(
-      expect.objectContaining({ code: 'truncated' }),
-    )
-    expect(() => decodeChunk(new Uint8Array(CHUNK_CODEC_BYTE_LENGTH + 1))).toThrowError(
-      expect.objectContaining({ code: 'trailing-data' }),
-    )
+    expectFailure(decodeChunk(null as never), 'invalid-value', /Uint8Array/)
+    expectFailure(decodeChunk(new DataView(new ArrayBuffer(0)) as never), 'invalid-value', /Uint8Array/)
+    expectFailure(decodeChunk(encoded.slice(0, -1)), 'truncated', /shorter/)
+    expectFailure(decodeChunk(new Uint8Array(CHUNK_CODEC_BYTE_LENGTH + 1)), 'trailing-data', /exactly/)
 
     const wrongMagic = encoded.slice()
     wrongMagic[0] = 0
-    expect(() => decodeChunk(wrongMagic)).toThrowError(
-      expect.objectContaining({ code: 'invalid-format' }),
-    )
+    expectFailure(decodeChunk(wrongMagic), 'invalid-format', /magic/)
 
     const wrongVersion = encoded.slice()
     wrongVersion[4] = CHUNK_CODEC_VERSION + 1
-    expect(() => decodeChunk(wrongVersion)).toThrowError(/unsupported/)
+    expectFailure(decodeChunk(wrongVersion), 'invalid-format', /unsupported/)
 
     const unsafeCoordinate = encoded.slice()
     const view = new DataView(unsafeCoordinate.buffer, unsafeCoordinate.byteOffset, unsafeCoordinate.byteLength)
     view.setBigInt64(5, BigInt(Number.MAX_SAFE_INTEGER) + 1n, true)
-    expect(() => decodeChunk(unsafeCoordinate)).toThrowError(/safe integer range/)
+    expectFailure(decodeChunk(unsafeCoordinate), 'invalid-value', /safe integer range/)
   })
 })
