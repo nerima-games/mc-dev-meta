@@ -82,6 +82,7 @@ pin すべきものは `repos.json` と各リポジトリ自身の lockfile に�
 | `pnpm check:portable` | root の portable Chunk/light 契約と clone 済み runtime の実値を突合 |
 | `pnpm typecheck` | `tsconfig.build.json`(純粋層)と `tsconfig.test.json`(scripts + tests)を型検査 |
 | `pnpm lint` | oxlint(このリポジトリ唯一の lint / format 設定)。**`--deny-warnings` 付きで走る**ため、`warn` のルールもビルドを落とす（`.oxlintrc.json` は 5 カテゴリすべてと個別 67 ルールが `warn`、`error` は 4 つだけ。このフラグが無かった頃は実質その 4 つしかゲートになっていなかった） |
+| `pnpm golden:fetch` | `test/golden/` の vanilla 由来データを固定 commit から取得し SHA-256 で検証する。commit しない。`pnpm test` の前に実行する([docs/conformance.md](./docs/conformance.md)) |
 | `pnpm test` | vitest(**プレーン vitest**。`@effect/vitest` は使わない — 依存ゼロのため) |
 | `pnpm test:coverage` | カバレッジ計測。4 指標 100% の閾値ゲート付き |
 | `pnpm check:mirrors` | 手書きミラー(`domain/kernel-vocabulary.ts` など)を**ミラー元リポジトリと突き合わせる**。下記 |

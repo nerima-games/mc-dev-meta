@@ -21,6 +21,11 @@
 # See docs/manifest.md.
 repos/
 
+# Vanilla-derived golden data (Mojang data via misode/mcmeta). It must not be
+# committed: `pnpm golden:fetch` fetches it from the pinned mcmeta commits and
+# verifies each file's SHA-256. See docs/conformance.md.
+test/golden/
+
 # Dependencies
 node_modules/
 .pnpm-store/

@@ -43,6 +43,7 @@
     "check:repoint": "tsx scripts/check-repoint.ts",
     "check:toolchain": "tsx scripts/check-toolchain.ts",
     "check:pins": "tsx scripts/check-pins.ts",
+    "golden:fetch": "tsx scripts/conformance/generate.ts --out test/golden",
     "typecheck": "tsc -p tsconfig.build.json --pretty false && tsc -p tsconfig.test.json --pretty false",
     "lint": "oxlint --deny-warnings src scripts test",
     "lint:fix": "oxlint --fix src scripts test",
