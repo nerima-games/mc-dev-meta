@@ -108,6 +108,16 @@ jobs:
       - name: Lint
         run: nix develop --command pnpm lint
 
+      # test/golden/ is vanilla-derived data and is not committed. The fetch
+      # verifies every file against the SHA-256 table in
+      # scripts/conformance/generate.ts and fails the job on any mismatch or
+      # fetch error. The token only raises the api.github.com rate limit for the
+      # two tree listings.
+      - name: Fetch vanilla golden
+        run: pnpm golden:fetch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Test
         run: pnpm test
 
